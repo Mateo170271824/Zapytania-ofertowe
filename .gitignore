@@ -10,3 +10,5 @@ node_modules/
 !manifest.webmanifest
 !tests/e2e/firebase.json
 *-debug.log
+!package-lock.json
+!capacitor.config.json

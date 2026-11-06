@@ -40,6 +40,19 @@ export function okno(html, przyciski = [{ v: "ok", t: "OK", cls: "primary" }], o
 }
 export const pytanie = async (t, b, ok = "OK") => (await okno(`<h3>${esc(t)}</h3><div class="small">${b}</div>`, [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: ok, cls: "primary" }])).v === "ok";
 export async function kopiuj(t) { try { await navigator.clipboard.writeText(t); toast("Skopiowano"); } catch { toast("Zaznacz tekst i skopiuj ręcznie"); } }
-export function pobierzPlik(nazwa, blob) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nazwa; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); }
+// aplikacja Android (Capacitor): pliki idą przez okno „Udostępnij” (zapis w Pobranych, Dysk, mail…)
+export const natywna = () => !!globalThis.Capacitor?.isNativePlatform?.();
+const base64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(blob); });
+async function udostepnij(nazwa, blob) {
+  const { Filesystem, Share } = globalThis.Capacitor.Plugins;
+  const plik = await Filesystem.writeFile({ path: nazwa, data: await base64(blob), directory: "CACHE" });
+  await Share.share({ title: nazwa, files: [plik.uri], dialogTitle: "Zapisz lub wyślij plik" });
+}
+export function zapiszXlsx(wb, nazwa) {
+  if (!natywna()) return globalThis.XLSX.writeFile(wb, nazwa);
+  pobierzPlik(nazwa, new Blob([globalThis.XLSX.write(wb, { type: "array", bookType: "xlsx" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+}
+export function pobierzPlik(nazwa, blob) {
+  if (natywna()) return udostepnij(nazwa, blob).catch(e => { if (!/cancel/i.test(e?.message || "")) toast("Nie udało się zapisać pliku: " + (e?.message || e)); }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nazwa; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); }
 export const czytajPlik = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsArrayBuffer(f); });
 

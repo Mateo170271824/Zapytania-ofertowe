@@ -12,6 +12,17 @@ Aplikacja zastępująca plik „Zapytania Lista 2026.xlsm”. Logika jest przeni
 - **Kopia zapasowa** – Ustawienia → Kopia zapasowa: Excel do przeglądania i plik .json do przywrócenia. Automat w repo Logistyka robi to samo w każdy poniedziałek (Actions → „Kopia Zapytań ofertowych”, 90 dni).
 - **Zastępstwa** – właściciel nadaje dostęp na czas urlopu, każda zmiana trafia do Dziennika zmian.
 
+## Na telefonie
+
+| Gdzie | Jak |
+|---|---|
+| **Android (APK)** | [Zapytania-ofertowe.apk](https://github.com/Mateo170271824/Zapytania-ofertowe/releases/download/android/Zapytania-ofertowe.apk) – pobierz na telefonie i otwórz (też: Ustawienia → Aplikacja na telefon) |
+| **iPhone / przeglądarka** | https://mateo170271824.github.io/Zapytania-ofertowe/ → Udostępnij → „Do ekranu początkowego” |
+
+APK (Capacitor, jak Kalkulator stali) otwiera aktualną stronę aplikacji, więc zmiany w Zapytaniach są od razu w telefonie – nowe APK potrzebne jest tylko przy zmianach w `android/`. Pliki (PDF, Excel, kopia) w APK zapisuje się przez okno „Udostępnij”.
+
+Automat `android.yml` buduje APK i wystawia je w Releases (tag `android`). Podpis: sekrety repozytorium `ANDROID_KEYSTORE_BASE64` i `ANDROID_KEYSTORE_PASSWORD` – **te same wartości co w repo Kalkulator-stali** (alias klucza `kalkulator`; inny można podać w `ANDROID_KEY_ALIAS`). Bez nich APK jest budowane tylko próbnie (Actions → Artifacts).
+
 ## Pliki
 
 | Plik | Co robi |

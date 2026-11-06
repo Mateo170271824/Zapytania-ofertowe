@@ -1,0 +1,12 @@
+{
+  "appId": "pl.zapytania.ofertowe",
+  "appName": "Zapytania ofertowe",
+  "webDir": "apk-www",
+  "server": {
+    "url": "https://mateo170271824.github.io/Zapytania-ofertowe/",
+    "errorPath": "offline.html"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Zapytania ofertowe</string>
+    <string name="title_activity_main">Zapytania ofertowe</string>
+    <string name="package_name">pl.zapytania.ofertowe</string>
+    <string name="custom_url_scheme">pl.zapytania.ofertowe</string>
+</resources>

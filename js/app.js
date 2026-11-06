@@ -2,7 +2,7 @@ import * as L from "./logika.js?v=202611061834";
 import * as I from "./import-excel.js?v=202611061834";
 import * as KP from "./kopia.js?v=202611061834";
 import * as ZM from "./zamowienia.js?v=202611061834";
-import { $, esc, pad, iso, today, toD, fDT, fD, clone, uidS, fmt, zl, ogolnyLiczba, kolLit, hex, toast, failed, show, msg, okno, pytanie, kopiuj, pobierzPlik, czytajPlik } from "./ui.js?v=202611061834";
+import { $, esc, pad, iso, today, toD, fDT, fD, clone, uidS, fmt, zl, ogolnyLiczba, kolLit, hex, toast, failed, show, msg, okno, pytanie, kopiuj, pobierzPlik, czytajPlik, zapiszXlsx, natywna } from "./ui.js?v=202611061834";
 import { C, firebase } from "./baza.js?v=202611061834";
 import { trescPomocy, START_ZASTEPCY } from "./pomoc.js?v=202611061834";
 import * as CE from "./ceny.js?v=202611061834";
@@ -415,7 +415,7 @@ async function oknoMail(z) {
     <div><div class="toolbar"><span class="small">UDW (${m.udw.split(",").length} adresów)</span><button type="button" class="btn sm" id="mCpA">Kopiuj adresy</button></div><div class="copybox" style="max-height:90px">${esc(m.udw)}</div></div>
     <div><span class="small">Temat:</span> <b>${esc(m.temat)}</b></div>
     <div><div class="toolbar"><span class="small">Treść (${m.ilePozycji} poz.)</span><button type="button" class="btn sm" id="mCpT">Kopiuj treść</button></div><div class="copybox">${esc(m.tresc)}</div></div>
-    <a class="btn primary" href="${esc(href)}" target="_blank" rel="noopener">Otwórz wiadomość w programie pocztowym</a>`,
+    <a class="btn primary" href="${esc(href)}" ${natywna() ? "" : 'target="_blank" rel="noopener"'}>Otwórz wiadomość w programie pocztowym</a>`,
     [{ v: "ok", t: "Zamknij" }], { poOtwarciu: f => { f.querySelector("#mCpA").onclick = () => kopiuj(m.udw); f.querySelector("#mCpT").onclick = () => kopiuj(`Temat: ${m.temat}\n\n${m.tresc}`); } });
 }
 
@@ -877,7 +877,7 @@ function eksportArkusza(z) {
   ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(z.wiersze.length, 1), c: ostK - 1 } });
   ws["!cols"] = [{ wch: 44 }, ...Array.from({ length: ostK - 1 }, () => ({ wch: 16 }))];
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, z.nazwa.slice(0, 31));
-  XLSX.writeFile(wb, `${z.nazwa}.xlsx`);
+  zapiszXlsx(wb, `${z.nazwa}.xlsx`);
 }
 
 /* ============================================================ pytania makra (długość, paczka, grubość, arkusz) */
@@ -1073,7 +1073,7 @@ function cenyWyroby(pk) {
   $("cRows").onclick = e => { if (e.target.closest("a,button,.wyk")) return; const tr = e.target.closest("tr[data-w]"); if (!tr) return; cenyStan.otwarty = cenyStan.otwarty === tr.dataset.w ? "" : tr.dataset.w; cenyWyroby(pk); };
   $("cXls").onclick = () => {
     const rows = lista.map(s => { const o = s.ostKg || s.ost; return { "Wyrób": s.opis, "Grupa": s.grupa, "Gatunek": s.gat, "zł/kg": o.zlKg && +o.zlKg.toFixed(2), "zł/mb": o.zlMb && +o.zlMb.toFixed(2), "zł/szt": o.zlSzt && +o.zlSzt.toFixed(2), "Długość [m]": o.dl || "", "Kiedy": o.data, "Data szacunkowa": o.szac ? "tak" : "", "Skąd": ZRODLA[o.zrodlo], "Dostawca": o.dostawca, "Pozycja": o.nazwa, "Min 12 mies. zł/kg": s.minRok && +s.minRok.toFixed(2), "Max 12 mies. zł/kg": s.maxRok && +s.maxRok.toFixed(2) }; });
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Ceny"); XLSX.writeFile(wb, `ceny-materialow-${today()}.xlsx`);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Ceny"); zapiszXlsx(wb, `ceny-materialow-${today()}.xlsx`);
   };
 }
 function szczegolyWyrobu(s) {
@@ -1144,7 +1144,7 @@ function cenyRok(pk) {
   $("rXls").onclick = () => {
     const M12 = ["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII"];
     const rows = lista.map(z => { const o = { [cenyStan.po === "grupa" ? "Grupa" : "Wyrób"]: z.nazwa }; z.mies.forEach((v, i) => o[M12[i]] = v === null ? "" : +v.toFixed(2)); o["Cen"] = z.ile; return o; });
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), `${cenyStan.rok} ${jed.replace("/", " na ")}`); XLSX.writeFile(wb, `zestawienie-cen-${cenyStan.rok}.xlsx`);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), `${cenyStan.rok} ${jed.replace("/", " na ")}`); zapiszXlsx(wb, `zestawienie-cen-${cenyStan.rok}.xlsx`);
   };
 }
 function cenySprawdz(spr) {
@@ -1210,6 +1210,8 @@ function renderUstawienia() {
   const pole = (k, l, opis, typ = "text") => `<label>${l}<input data-u="${k}" value="${esc(UE[k] ?? "")}" ${typ === "tn" ? 'list="tnList"' : ""}><span class="small">${opis}</span></label>`;
   const wagiF = WE.rows.map((r, i) => [r, i]).filter(([r]) => !wagiQ || L.LC(`${r.t} ${r.w} ${r.o} ${r.u}`).includes(L.LC(wagiQ)));
   M().innerHTML = `
+  ${natywna() ? "" : `<div class="panel"><div class="hd"><div><h3>Aplikacja na telefon (Android)</h3><span class="small">Pobierz plik na telefonie i otwórz go – Android zapyta o zgodę na instalację z tego źródła. Aplikacja otwiera zawsze aktualną wersję Zapytań, nie trzeba jej aktualizować. Na iPhonie: Safari → Udostępnij → „Do ekranu początkowego”.</span></div></div>
+    <div class="bd toolbar"><a class="btn" href="https://github.com/Mateo170271824/Zapytania-ofertowe/releases/download/android/Zapytania-ofertowe.apk">Pobierz Zapytania-ofertowe.apk</a></div></div>`}
   <div class="panel"><div class="hd"><div><h3>Wygląd</h3><span class="small">Kolorystyka aplikacji na tym urządzeniu. Ciemny tryb dopasowuje się do ustawień systemu.</span></div></div>
     <div class="bd motywy" id="uMotyw">${MOTYWY.map(([k, n, th, ak]) => `<button class="motyw" data-m="${k}" aria-pressed="${motyw() === k}"><span class="prev"><span style="background:${th}"></span><span style="background:${ak}"></span><span style="background:#c6efce"></span></span><b>${n}</b></button>`).join("")}</div></div>
   <div class="panel"><div class="hd"><div><h3>Dziennik zmian</h3><span class="small">Kto, kiedy i co zmienił – także zmiany zastępcy w czasie urlopu.${isOwner && LOG.some(l => l.zast && !l.przejrzane) ? ` <b class="red">${LOG.filter(l => l.zast && !l.przejrzane).length} zmian zastępcy do przejrzenia.</b>` : ""}</span></div><a class="btn" href="#dziennik">Otwórz dziennik zmian</a></div></div>
@@ -1313,7 +1315,7 @@ async function biezacaKopia() {
 async function pobierzKopie(rodzaj) {
   const k = await biezacaKopia(), d = today();
   if (rodzaj === "json") pobierzPlik(`zapytania-kopia-${d}.json`, new Blob([JSON.stringify(k)], { type: "application/json" }));
-  else XLSX.writeFile(KP.kopiaExcel(XLSX, k), `zapytania-kopia-${d}.xlsx`);
+  else zapiszXlsx(KP.kopiaExcel(XLSX, k), `zapytania-kopia-${d}.xlsx`);
   toast("Pobrano kopię");
 }
 async function przywrocKopie(f) {
