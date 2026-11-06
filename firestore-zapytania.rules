@@ -1,0 +1,56 @@
+// ===== Zapytania ofertowe =====
+// Fragment do wklejenia w firestore.rules (repo Logistyka), wewnątrz bloku:
+//   match /databases/{database}/documents { ... }
+//
+// Właściciel = konto zapisane jako admin w meta/init (to samo co w Kooperacjach).
+// Zastępca = konto wpisane w zap_ustawienia/dostep.zastepcy, tylko w dniach od–do
+// i tylko dopóki dostęp nie został odebrany.
+// Każdy zapis zapytania lub projektu musi mieć wpis w dzienniku w tej samej transakcji.
+// Wpisów w dzienniku nie da się usunąć ani zmienić (poza odhaczeniem „przejrzane” przez właściciela).
+
+function zapWlasciciel() {
+  return request.auth != null
+    && request.auth.uid == get(/databases/$(database)/documents/meta/init).data.admin;
+}
+function zapZastepca() {
+  let z = get(/databases/$(database)/documents/zap_ustawienia/dostep).data.zastepcy;
+  return request.auth != null
+    && request.auth.uid in z
+    && !('odwolano' in z[request.auth.uid])
+    && request.time >= z[request.auth.uid].od
+    && request.time < z[request.auth.uid]['do'];
+}
+function zapDostep() {
+  return zapWlasciciel() || zapZastepca();
+}
+function zapZDziennikiem() {
+  return existsAfter(/databases/$(database)/documents/zap_dziennik/$(request.resource.data.ostatniWpis))
+    && (resource == null || request.resource.data.ostatniWpis != resource.data.ostatniWpis);
+}
+
+match /zap_zapytania/{id} {
+  allow read: if zapDostep();
+  allow create, update: if zapDostep() && zapZDziennikiem();
+  allow delete: if zapWlasciciel();
+}
+match /zap_projekty/{id} {
+  allow read: if zapDostep();
+  allow create, update: if zapDostep() && zapZDziennikiem();
+  allow delete: if zapWlasciciel();
+}
+match /zap_dziennik/{id} {
+  allow read: if zapDostep();
+  allow create: if zapDostep()
+    && request.resource.data.kto == request.auth.uid
+    && request.resource.data.kiedy == request.time
+    && request.resource.data.zast == !zapWlasciciel()
+    && request.resource.data.przejrzane == zapWlasciciel();
+  allow update: if zapWlasciciel()
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['przejrzane', 'przejrzanoKiedy']);
+  allow delete: if false;
+}
+// config, wagi, generator – właściciel i zastępca; dostep – tylko właściciel
+match /zap_ustawienia/{d} {
+  allow read: if (d == 'dostep' && request.auth != null) || zapDostep();
+  allow write: if (d == 'dostep' && zapWlasciciel()) || (d != 'dostep' && zapDostep());
+}

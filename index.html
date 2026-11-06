@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Zapytania ofertowe</title>
+<meta name="description" content="Generator zapytań ofertowych z braków w Subiekcie, porównanie cen dostawców, waga dla logistyki i koszt projektu.">
+<meta name="theme-color" content="#366092">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="v-msg" class="login"><div class="empty"><strong id="msgT">Wczytywanie…</strong><span id="msgS"></span></div></div>
+
+<div id="v-login" class="login" hidden>
+  <form id="loginF" autocomplete="on">
+    <h1>Zapytania ofertowe</h1>
+    <p class="small">Zaloguj się tym samym kontem co w Kooperacjach i Truck App.</p>
+    <label>Login<input id="lgLogin" autocomplete="username" required></label>
+    <label>Hasło<input id="lgPass" type="password" autocomplete="current-password" required></label>
+    <div class="err" id="lgErr" hidden></div>
+    <button class="btn primary" type="submit">Zaloguj</button>
+  </form>
+</div>
+
+<div id="v-app" class="wrap" hidden>
+  <header class="top">
+    <div><h1>Zapytania ofertowe</h1><p class="sub" id="hSub"></p></div>
+    <div class="who"><span id="whoName"></span><span id="whoRole"></span><button class="btn sm" id="btnOut">Wyloguj</button></div>
+  </header>
+  <div id="zastBanner" class="notice" hidden></div>
+  <nav class="tabs" id="tabs">
+    <button data-v="generator">Generator</button>
+    <button data-v="zapytania">Zapytania</button>
+    <button data-v="projekty">Projekty</button>
+    <button data-v="ustawienia">Ustawienia</button>
+    <button data-v="dziennik">Dziennik zmian<span class="cnt" id="logCnt" hidden></span></button>
+    <button data-v="dostep" id="tabDostep" hidden>Dostęp</button>
+  </nav>
+  <main id="widok"></main>
+</div>
+
+<dialog id="dlg"><form method="dialog" id="dlgF"></form></dialog>
+<div id="cellbar" class="cellbar" hidden></div>
+
+<script src="vendor/xlsx.full.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

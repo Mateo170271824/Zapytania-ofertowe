@@ -1,0 +1,7 @@
+# dane firmowe nie trafiają do repozytorium (repo jest publiczne)
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+*.pdf
+node_modules/

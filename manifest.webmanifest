@@ -1,0 +1,14 @@
+{
+  "name": "Zapytania ofertowe",
+  "short_name": "Zapytania",
+  "description": "Generator zapytań ofertowych, porównanie cen dostawców, waga dla logistyki i koszt projektu.",
+  "lang": "pl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f3f1",
+  "theme_color": "#366092",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
