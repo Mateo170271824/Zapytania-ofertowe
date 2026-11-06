@@ -1,6 +1,6 @@
-import * as L from "./logika.js?v=202611061040";
-import * as I from "./import-excel.js?v=202611061040";
-import * as CE from "./ceny.js?v=202611061040";
+import * as L from "./logika.js?v=202611061048";
+import * as I from "./import-excel.js?v=202611061048";
+import * as CE from "./ceny.js?v=202611061048";
 
 /* ============================================================ konfiguracja */
 const firebaseConfig = {
@@ -457,7 +457,7 @@ function renderArkusz() {
         ${isOwner ? `<button class="btn danger" id="aUsun">Usuń</button>` : ""}
       </div></div>
       <div class="bd legend" id="aLegenda"></div>
-      <div class="bd notice" id="aWyborInfo" hidden>Tryb wyboru: kliknij cenę dostawcy w wierszu pozycji – pozycja i nagłówek dostawcy dostaną ten sam kolor (jak zaznaczanie kolorem w Excelu). Kliknięcie pozycji w kolumnie A usuwa wybór, kliknięcie nagłówka dostawcy zmienia jego kolor.</div>
+      <div class="bd notice" id="aWyborInfo" hidden>Tryb wyboru: kliknij cenę dostawcy w wierszu pozycji – pozycja i nagłówek dostawcy dostaną ten sam kolor (jak zaznaczanie kolorem w Excelu). Kliknięcie pozycji w kolumnie A usuwa wybór, kliknięcie nagłówka dostawcy zmienia jego kolor. Bez tego trybu: kliknij cenę i użyj „Wybierz tego dostawcę”.</div>
     </div>
     <div id="aBox"><div class="arkuszbox" id="aGrid"></div></div>
     <div class="panel"><div class="hd"><h3>Historia zmian</h3></div><div class="log" id="aLog"></div></div>`;
@@ -636,15 +636,20 @@ document.addEventListener("click", e => {
   const r = +td.dataset.r, c = +td.dataset.c;
   if (r === 1 && c >= 2) return paletaNaglowka(c);
   if (r >= 2 && c === 1) { const w = E.wiersze[r - 2]; if (w && L.kolor(w.k) !== -1) { delete w.k; zmiana(); rysujArkusz(); } return; }
-  if (r >= 2 && c >= 2) {
-    const w = wiersz(r); if (!L.vbaTrim(w.a)) return toast("W tym wierszu nie ma pozycji");
-    const n = E.naglowki?.[c];
-    if (!n || !L.vbaTrim(n.t)) return toast("Kolumna nie ma nazwy dostawcy w wierszu 1");
-    if (L.kolor(n.k) === -1) { const uzyte = new Set(Object.values(E.naglowki).map(h => L.kolor(h.k))); n.k = PALETA.find(p => !uzyte.has(p)) || PALETA[0]; }
-    if (L.kolor(w.k) === L.kolor(n.k)) delete w.k; else w.k = n.k;
-    zmiana(); rysujArkusz();
-  }
+  if (r >= 2 && c >= 2) wybierzDostawce(r, c);
 });
+// pozycja w wierszu r idzie do dostawcy z kolumny c (kolor nagłówka = kolor pozycji, jak w Excelu).
+// Ponowne / podwójne kliknięcie nie zdejmuje wyboru – zdejmuje go kliknięcie pozycji w kolumnie A.
+function wybierzDostawce(r, c) {
+  const w = wiersz(r); if (!L.vbaTrim(w.a)) return toast("W tym wierszu nie ma pozycji");
+  const n = E.naglowki?.[c];
+  if (!n || !L.vbaTrim(n.t)) return toast("Kolumna nie ma nazwy dostawcy w wierszu 1");
+  if (L.kolor(n.k) === -1) { const uzyte = new Set(Object.values(E.naglowki).map(h => L.kolor(h.k))); n.k = PALETA.find(p => !uzyte.has(p)) || PALETA[0]; }
+  if (L.kolor(w.k) === L.kolor(n.k)) return;
+  w.k = n.k;
+  zmiana(); rysujArkusz();
+  toast(`${L.vbaTrim(w.a).slice(0, 40)} → ${n.t}`);
+}
 async function paletaNaglowka(c) {
   const n = E.naglowki?.[c]; if (!n || !L.vbaTrim(n.t)) return toast("Najpierw wpisz nazwę dostawcy w wierszu 1");
   const r = await okno(`<h3>Kolor dostawcy: ${esc(n.t)}</h3><div class="paleta">${PALETA.map(p => `<button type="button" data-p="${p}" style="background:#${p}" title="#${p}"></button>`).join("")}</div>
@@ -666,6 +671,8 @@ async function paletaNaglowka(c) {
 function pokazPasek(el, r, c) {
   const bar = $("cellbar"), rc = el.getBoundingClientRect();
   const btn = [`<button class="btn sm" data-a="kom">Komentarz</button>`];
+  if (r >= 2 && c >= 2 && L.vbaTrim(E.wiersze[r - 2]?.a || "") && L.vbaTrim(E.naglowki?.[c]?.t || "")) btn.unshift(`<button class="btn sm primary" data-a="wybierz">Wybierz tego dostawcę</button>`);
+  if (r >= 2 && c === 1 && L.kolor(E.wiersze[r - 2]?.k) !== -1) btn.unshift(`<button class="btn sm" data-a="bezWyboru">Usuń wybór dostawcy</button>`);
   if (r >= 2 && c === 1) btn.push(`<button class="btn sm" data-a="wstawW">Wstaw wiersz nad</button>`, `<button class="btn sm" data-a="usunW">Usuń wiersz</button>`);
   if (r === 1 && c >= 2) btn.push(`<button class="btn sm" data-a="wstawK">Wstaw kolumnę przed</button>`, `<button class="btn sm" data-a="usunK">Usuń kolumnę</button>`);
   if (r >= 2 && c >= 2 && L.kolor(E.wiersze[r - 2]?.c?.[c]?.k) !== -1) btn.push(`<button class="btn sm" data-a="bezKol">Usuń kolor komórki</button>`);
@@ -692,6 +699,8 @@ $("cellbar").addEventListener("click", async e => {
     else if (c === 1) { const w = wiersz(r); if (m) w.m = m; else delete w.m; }
     else { const w = wiersz(r); w.c = w.c || {}; w.c[c] = { ...(w.c[c] || {}), m }; if (!m) { delete w.c[c].m; if (!Object.keys(w.c[c]).length) delete w.c[c]; } }
   }
+  if (a === "wybierz") return wybierzDostawce(r, c);
+  if (a === "bezWyboru") { const w = E.wiersze[r - 2]; if (w) delete w.k; }
   if (a === "wstawW") E.wiersze.splice(r - 2, 0, { a: "", c: {} });
   if (a === "usunW") { if (!(await pytanie("Usunąć wiersz?", `Wiersz ${r}: ${esc(E.wiersze[r - 2]?.a || "(pusty)")}`, "Usuń"))) return; E.wiersze.splice(r - 2, 1); }
   if (a === "wstawK" || a === "usunK") {
@@ -861,7 +870,7 @@ async function renderKoszt() {
     <div class="tablebox"><table class="t" style="min-width:1300px"><thead><tr><th>PROJEKT</th><th>KOD KLIENTA</th><th>DATA</th><th>SYMBOL</th><th>NAZWA</th><th>J.M.</th><th class="num">ILOŚĆ W DOK.</th><th class="num">NIEZAREZ.</th><th class="num">NA ZD</th><th class="num">CENA ZAKUPU</th><th>ZAPYTANO</th><th>ARKUSZ ZAPYTANIA</th><th>TREŚĆ W ZAPYTANIU</th></tr></thead><tbody>
     ${p.pozycje.map(x => `<tr><td>${esc(p.id)}</td><td>${esc(p.kod)}</td><td>${fD(p.data)}</td><td class="mono">${esc(x.symbol)}</td><td>${esc(x.nazwa)}</td><td>${esc(x.jm)}</td><td class="num">${L.ogolny(x.ilosc)}</td><td class="num">${L.ogolny(x.niez)}</td><td class="num">${L.ogolny(x.nazd)}</td><td class="num">${x.cz !== undefined ? L.ogolny(x.cz) : ""}</td><td>${esc(x.zapytano)}</td><td>${esc(x.ark)}</td><td>${esc(x.tresc)}</td></tr>`).join("")}</tbody></table></div></details>`;
   $("kPdf").onclick = async () => {
-    try { const pdf = await import("./pdf.js?v=202611061040"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
+    try { const pdf = await import("./pdf.js?v=202611061048"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
     catch (x) { console.error(x); toast("Nie udało się zrobić PDF: " + (x.message || x)); }
   };
 }
