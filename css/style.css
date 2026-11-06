@@ -183,3 +183,11 @@ table.gen td:nth-child(4){min-width:120px}
 .chk input{width:auto}
 main > *, #cWidok, #aBox { min-width:0 }
 #cWidok { display:grid; gap:14px }
+/* szersze komórki */
+table.ark td.a{min-width:400px;width:400px}
+@media (max-width:700px){table.ark td.a{min-width:220px;width:220px}}
+table.ark td.c{min-width:160px;width:160px}
+table.ark input,table.ark textarea{font-size:14px;padding:6px 9px}
+table.t td{padding:7px 11px}
+table.t td.strong:first-child,#cRows td:first-child{min-width:240px}
+table.gen td:nth-child(3),table.gen td:nth-child(14){min-width:280px}
