@@ -4,7 +4,7 @@
 import * as L from "./logika.js";
 
 export const WYKLUCZ_NAZWA = /WYPA[ŁL]K|W[ÓO]ZE?K/;          // wypałki, wózki podwieszane
-export const WYKLUCZ_RODZAJ = ["LT"];                          // kolumna B listy
+export const WYKLUCZ_RODZAJ = ["KT"];                          // kolumna B listy (KT – kooperacja)
 
 const NAZWY_TYPOW = { PROFIL: "Profil", PROFILALU: "Profil ALU", RURA: "Rura", BRAMOWY: "Profil bramowy", IPE: "IPE", IPN: "IPN", HEA: "HEA", HEB: "HEB", HEM: "HEM",
   UPN: "UPN", UPE: "UPE", KATOWNIK: "Kątownik", KATOWNIKZG: "Kątownik Z/G", CEOWNIK: "Ceownik", PLASKOWNIK: "Płaskownik", PRET: "Pręt", PRETKW: "Pręt kwadratowy",
@@ -92,8 +92,9 @@ export function czytajListe(tabela, ctx, jmZnane = {}) {
     if (!nazwa) continue;
     surowe.push({ symbol: L.vbaTrim(String(row[kSym] ?? "")), rodzaj: L.UC(L.vbaTrim(String(row[kRodz] ?? ""))), nazwa, cena: L.liczba(row[kCena]), jm: kJm >= 0 ? L.vbaTrim(String(row[kJm] ?? "")) : "" });
   }
-  const pominiete = { lt: 0, wypalki: 0, duplikaty: 0, zero: 0 };
-  let lista = surowe.filter(p => { if (WYKLUCZ_RODZAJ.includes(p.rodzaj)) { pominiete.lt++; return false; } if (WYKLUCZ_NAZWA.test(L.UC(p.nazwa))) { pominiete.wypalki++; return false; } return true; });
+  const pominiete = { kt: 0, wypalki: 0, duplikaty: 0, zero: 0 };
+  const wykluczoneSymbole = [];
+  let lista = surowe.filter(p => { if (WYKLUCZ_RODZAJ.includes(p.rodzaj)) { pominiete.kt++; wykluczoneSymbole.push(p.symbol); return false; } if (WYKLUCZ_NAZWA.test(L.UC(p.nazwa))) { pominiete.wypalki++; wykluczoneSymbole.push(p.symbol); return false; } return true; });
   // duplikaty po nazwie: zostaje pozycja z ceną > 0, a z kilku – o nowszym (wyższym) symbolu
   const wg = new Map();
   for (const p of lista) {
@@ -117,7 +118,7 @@ export function czytajListe(tabela, ctx, jmZnane = {}) {
     if (!poz.jm || !w) { poz.powod = !w ? "nie rozpoznano wyrobu (typ i wymiar)" : poz.skad; doSprawdzenia.push(poz); }
     pozycje.push(poz);
   }
-  return { pozycje, doSprawdzenia, pominiete, wszystkich: surowe.length };
+  return { pozycje, doSprawdzenia, pominiete, wykluczoneSymbole, wszystkich: surowe.length };
 }
 
 // ---------------------------------------------------------------- daty zapytań

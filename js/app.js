@@ -1050,10 +1050,13 @@ async function wgrajListeCen(f) {
     const { _id, ...reszta } = st;
     ops.push({ c: C.c, id, d: czysc({ ...reszta, nazwa: p.nazwa, jm, skad: st.jmRecznie ? st.skad : p.skad, powod: p.powod, status, historia: h }) });
   }
-  const opis = `${r.pozycje.length} poz. (nowe ${nowe}, zmiany cen ${zmiany}, bez zmian ${bez}); pominięte: wypałki/wózki ${r.pominiete.wypalki}, LT ${r.pominiete.lt}, duplikaty ${r.pominiete.duplikaty}, cena 0 ${r.pominiete.zero}; do sprawdzenia ${r.doSprawdzenia.length}`;
+  // pozycje wcześniej zapisane, a teraz wykluczone (KT, wypałki, wózki) – wyłączone z zestawień
+  let wylaczone = 0;
+  for (const sym of r.wykluczoneSymbole) { const id = docId(sym), st = stare.get(id); if (st && st.status !== "pomin") { const { _id, ...reszta } = st; ops.push({ c: C.c, id, d: czysc({ ...reszta, status: "pomin", powod: "wykluczone (KT / wypałki / wózki)" }) }); wylaczone++; } }
+  const opis = `${r.pozycje.length} poz. (nowe ${nowe}, zmiany cen ${zmiany}, bez zmian ${bez}${wylaczone ? `, wyłączone ${wylaczone}` : ""}); pominięte: wypałki/wózki ${r.pominiete.wypalki}, KT ${r.pominiete.kt}, duplikaty ${r.pominiete.duplikaty}, cena 0 ${r.pominiete.zero}; do sprawdzenia ${r.doSprawdzenia.length}`;
   const o = await okno(`<h3>Lista cen: ${esc(f.name)}</h3><ul>
-    <li>Pozycji w pliku: <b>${r.wszystkich}</b></li><li>Pominięte: wypałki i wózki ${r.pominiete.wypalki}, oznaczenie LT ${r.pominiete.lt}, duplikaty nazw ${r.pominiete.duplikaty}, cena 0: ${r.pominiete.zero}</li>
-    <li>Nowe w bazie: <b>${nowe}</b>, zmienione ceny: <b>${zmiany}</b>, bez zmian: ${bez}</li><li>Do sprawdzenia (jednostka niepewna, zaślepka albo nierozpoznany wyrób): <b>${r.doSprawdzenia.length}</b></li></ul>
+    <li>Pozycji w pliku: <b>${r.wszystkich}</b></li><li>Pominięte: wypałki i wózki ${r.pominiete.wypalki}, oznaczenie KT ${r.pominiete.kt}, duplikaty nazw ${r.pominiete.duplikaty}, cena 0: ${r.pominiete.zero}</li>
+    <li>Nowe w bazie: <b>${nowe}</b>, zmienione ceny: <b>${zmiany}</b>, bez zmian: ${bez}${wylaczone ? `, wyłączone z bazy (KT, wypałki, wózki): <b>${wylaczone}</b>` : ""}</li><li>Do sprawdzenia (jednostka niepewna, zaślepka albo nierozpoznany wyrób): <b>${r.doSprawdzenia.length}</b></li></ul>
     <p class="small">Cena dostaje dzisiejszą datę. Przy kolejnym wgraniu dopisze się tylko tam, gdzie się zmieniła.</p>`, [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Zapisz w bazie", cls: "primary" }]);
   if (o.v !== "ok") return;
   try {
