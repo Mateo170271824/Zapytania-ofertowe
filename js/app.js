@@ -1,6 +1,6 @@
-import * as L from "./logika.js?v=202611061048";
-import * as I from "./import-excel.js?v=202611061048";
-import * as CE from "./ceny.js?v=202611061048";
+import * as L from "./logika.js?v=202611061353";
+import * as I from "./import-excel.js?v=202611061353";
+import * as CE from "./ceny.js?v=202611061353";
 
 /* ============================================================ konfiguracja */
 const firebaseConfig = {
@@ -274,6 +274,7 @@ function renderGenerator() {
   <div class="panel"><div class="hd"><h2>Generator zapytań ofertowych – braki magazynowe z Subiekta nexo</h2>
     <div class="toolbar">
       <label class="btn primary filebtn"><span class="nr">1</span>Wczytaj eksport<input type="file" id="gFile" accept=".xlsx,.xls,.xlsm,.csv"></label>
+      <button class="btn" id="gMag">Zapytanie na magazyn</button>
       <button class="btn primary" id="gUtworz"><span class="nr">2</span>Utwórz zapytanie</button>
       <button class="btn" id="gMail"><span class="nr">3</span>Mail do dostawców</button>
       <button class="btn" id="gWyczysc"><span class="nr">4</span>Wyczyść listę</button>
@@ -302,6 +303,7 @@ function renderGenerator() {
       : `<div class="empty"><strong>Lista jest pusta</strong><span>Kliknij „1. Wczytaj eksport” i wskaż plik wyeksportowany z Subiekta nexo (z kolumnami Nazwa, Stan, Niezarezerwowane, Na ZD, Cena netto).</span></div>`}
   </div>`;
   $("gFile").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) wczytajEksportPlik(f); };
+  $("gMag").onclick = zapytanieNaMagazyn;
   $("gUtworz").onclick = utworzZapytanie;
   $("gMail").onclick = mailOstatnie;
   $("gWyczysc").onclick = async () => { if (await pytanie("Wyczyść listę", "Wyczyścić listę pozycji i pola nad tabelą?", "Wyczyść")) zapiszGenerator({ kod: "", plik: "", ostatnie: "", wiersze: [] }, [{ p: "lista", a: G.wiersze.length + " poz.", b: "" }], "wyczyszczenie listy"); };
@@ -384,6 +386,72 @@ async function mailOstatnie() {
   for (const n of nazwy) { const z = zapByNazwa(n); if (z) await oknoMail(z); else toast("Nie ma zapytania: " + n); }
 }
 
+/* ============================================================ pozycje z listy materiałów (zakładka Ceny) */
+// okno wyboru: szukaj, zaznacz, wpisz ilość i jednostkę -> [{symbol, nazwa, jm, ilosc}]
+async function wybierzZListy() {
+  startCeny();
+  if (!(await czekajNa(() => cenyZal, 8000))) return toast("Nie udało się wczytać listy materiałów"), null;
+  const lista = CEN.filter(d => d.status !== "pomin" && d.nazwa).sort((a, b) => a.nazwa.localeCompare(b.nazwa, "pl", { numeric: true }));
+  if (!lista.length) { await okno(`<h3>Lista materiałów jest pusta</h3><p>Najpierw wgraj listę z Subiekta w zakładce „Ceny”.</p>`); return null; }
+  const wyb = new Map();          // id -> {ilosc, jm}
+  const jmDom = d => { const t = L.typWyrobu(L.UC(d.nazwa)); return ["PRET", "PRETKW", "PRET6K"].includes(t) ? "kg" : ["szt", "kg", "mb"].includes(d.jm) ? d.jm : "szt"; };
+  let q = "";
+  const wiersze = () => {
+    const f = L.LC(q).split(/\s+/).filter(Boolean);
+    const pasuje = lista.filter(d => f.every(t => L.LC(d.nazwa + " " + d.symbol).includes(t)));
+    return pasuje.slice(0, 120).map(d => { const w = wyb.get(d._id), c = d.historia?.at(-1)?.c;
+      return `<tr data-id="${esc(d._id)}"><td><input type="checkbox" ${w ? "checked" : ""} aria-label="wybierz"></td><td>${esc(d.nazwa)}<div class="small mono">${esc(d.symbol)}${c ? ` · ${fmt(c, 2)} zł/${esc(d.jm || "?")}` : ""}</div></td>
+        <td style="width:90px"><input data-il inputmode="decimal" value="${esc(w ? L.ogolny(w.ilosc) : "")}" placeholder="ilość"></td>
+        <td style="width:96px"><select data-jm>${["szt", "kg", "mb", "paczka"].map(j => `<option ${(w ? w.jm : jmDom(d)) === j ? "selected" : ""}>${j}</option>`).join("")}</select></td></tr>`; }).join("")
+      + (pasuje.length > 120 ? `<tr><td colspan="4" class="small">… i ${pasuje.length - 120} więcej – zawęź wyszukiwanie</td></tr>` : "")
+      + (pasuje.length ? "" : `<tr><td colspan="4" class="small">Nic nie pasuje</td></tr>`);
+  };
+  const r = await okno(`<h3>Dodaj z listy materiałów</h3>
+    <input type="search" id="zlQ" placeholder="Szukaj: 100x100x3, IPE 300, pręt 16… (kilka słów naraz)" autofocus>
+    <div class="tablebox" style="max-height:52vh;overflow:auto"><table class="t ed"><tbody id="zlRows">${wiersze()}</tbody></table></div>
+    <div class="small" id="zlIle">Zaznaczono: 0</div>`,
+    [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Dodaj zaznaczone", cls: "primary" }],
+    { szer: "min(860px, calc(100vw - 24px))", poOtwarciu: f => {
+      const ile = () => f.querySelector("#zlIle").textContent = `Zaznaczono: ${wyb.size}` + (wyb.size ? " – " + [...wyb.values()].slice(0, 4).map(w => w.nazwa).join(", ") + (wyb.size > 4 ? "…" : "") : "");
+      const odczyt = tr => { const d = lista.find(x => x._id === tr.dataset.id), on = tr.querySelector('input[type="checkbox"]').checked, v = tr.querySelector("[data-il]").value.trim(), jm = tr.querySelector("[data-jm]").value;
+        if (!on) { wyb.delete(d._id); return; }
+        const n = L.naLiczbe(v); wyb.set(d._id, { symbol: d.symbol, nazwa: d.nazwa, jm: jm === "paczka" ? (jmDom(d)) : jm, ilosc: jm === "paczka" ? (n.ok && n.w > 1 ? `${L.ogolny(n.w)} paczki` : "paczka") : (n.ok ? n.w : ""), cz: d.historia?.at(-1)?.c, jmCeny: d.jm }); };
+      f.querySelector("#zlQ").oninput = e => { q = e.target.value; f.querySelector("#zlRows").innerHTML = wiersze(); };
+      f.querySelector("#zlRows").addEventListener("input", e => { const tr = e.target.closest("tr[data-id]"); if (!tr) return; if (e.target.matches("[data-il]") && e.target.value.trim()) tr.querySelector('input[type="checkbox"]').checked = true; odczyt(tr); ile(); });
+      f.querySelector("#zlRows").addEventListener("change", e => { const tr = e.target.closest("tr[data-id]"); if (tr) { odczyt(tr); ile(); } });
+    } });
+  if (r.v !== "ok" || !wyb.size) return null;
+  const bez = [...wyb.values()].filter(w => w.ilosc === "").length;
+  if (bez && !(await pytanie("Brak ilości", `Pozycji bez ilości: <b>${bez}</b>. Dodać mimo to? (w generatorze będą zaznaczone na żółto)`, "Dodaj"))) return null;
+  return [...wyb.values()];
+}
+// zapytanie na magazyn: pozycje z listy materiałów, bez generatora i bez danych projektu
+async function zapytanieNaMagazyn() {
+  const wyb = await wybierzZListy(); if (!wyb) return;
+  const rok = L.rokNumeru(U), nr = L.nastepnyNumer(Z.map(z => z.nazwa), rok);
+  const r = await okno(`<h3>Zapytanie na magazyn</h3><div class="grid2"><label>Numer<input name="n" value="${nr}-${rok}" required></label><label>Kod (komórka A1)<input name="k" value="MAG"></label></div>
+    <p class="small">${wyb.length} poz.: ${esc(wyb.slice(0, 5).map(x => x.nazwa).join(", "))}${wyb.length > 5 ? "…" : ""}</p><p class="small">Zapytanie nie tworzy danych projektu – koszt projektu go nie dotyczy.</p>`,
+    [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Utwórz zapytanie", cls: "primary" }]);
+  if (r.v !== "ok") return;
+  let nazwa = r.form.n.value.trim() || `${nr}-${rok}`;
+  const kod = r.form.k.value.trim();
+  if (L.UC(L.vbaTrim(U.kodWNazwie)) === "TAK" && kod && !nazwa.includes(" ")) nazwa += " " + kod;   // jak „kod klienta w nazwie” w Ustawieniach
+  nazwa = L.wolnaNazwa(Z.map(z => z.nazwa), nazwa);
+  let krok = Math.trunc(L.ustLiczba(U.krok, 2)); if (krok < 1) krok = 1;
+  let start = Math.trunc(L.ustLiczba(U.start, 2)); if (start < 2) start = 2;
+  const wiersze = []; let w = start;
+  for (const x of wyb) { while (wiersze.length < w - 2) wiersze.push({ a: "", c: {} }); wiersze.push({ a: L.trescPozycji({ nazwa: x.nazwa, ilZap: x.ilosc, jm: x.jm }), c: {} }); w += krok; }
+  const m = nazwa.match(/^(\d+)-(\d{4})/);
+  try {
+    const z = await zapiszDok(C.z, null, { nazwa, kod, numer: m ? +m[1] : null, rok: m ? +m[2] : null, naglowki: {}, wiersze, dataZap: today(), magazyn: true, kolejnosc: Math.max(0, ...Z.map(z => z.kolejnosc ?? 0)) + 1 },
+      { typ: "zapytanie", etykieta: nazwa, diffFn: diffZap });
+    const o = await okno(`<h3>Zapytanie gotowe</h3><p>Utworzono: <b>${esc(nazwa)}</b> – ${wyb.length} poz.</p><p>Przygotować maila do dostawców?</p>`, [{ v: "nie", t: "Nie", nv: true }, { v: "tak", t: "Tak", cls: "primary" }]);
+    const zz = await czekajNa(() => zapById(z.id));
+    if (o.v === "tak" && zz) await oknoMail(zz);
+    go("z", z.id);
+  } catch (x) { failed(x); }
+}
+
 /* ============================================================ 3. mail */
 async function oknoMail(z) {
   const m = L.przygotujMail(z, U);
@@ -405,7 +473,7 @@ function renderLista() {
   const q = L.LC(listaQ);
   const lista = zapytaniaPosort().filter(z => !q || L.LC(z.nazwa + " " + z.kod + " " + z.wiersze.map(w => w.a).join(" ") + " " + Object.values(z.naglowki || {}).map(h => h.t).join(" ")).includes(q));
   M().innerHTML = `<div class="panel"><div class="hd"><div class="toolbar"><input id="lQ" type="search" placeholder="Przejdź do zapytania: numer, kod klienta, pozycja, dostawca…" style="width:340px" value="${esc(listaQ)}"></div>
-    <div class="toolbar"><button class="btn" id="lNowe">+ Puste zapytanie (z wzoru)</button></div></div>
+    <div class="toolbar"><button class="btn primary" id="lMag">Zapytanie na magazyn</button><button class="btn" id="lNowe">+ Puste zapytanie (z wzoru)</button></div></div>
     <div class="lista">${lista.slice(0, 300).map(z => {
       const poz = z.wiersze.filter(w => L.vbaTrim(w.a)).length, dost = Object.values(z.naglowki || {}).filter(h => h.t).length, wyb = Object.values(z.naglowki || {}).filter(h => L.kolor(h.k) !== -1).length;
       const proj = L.projektDlaZapytania(P, z.nazwa);
@@ -417,6 +485,7 @@ function renderLista() {
   $("lQ").onkeydown = e => { if (e.key === "Enter") { const f = M().querySelector(".it"); if (f) go("z", f.dataset.id); } };
   M().querySelector(".lista").onclick = e => { const it = e.target.closest(".it"); if (it) go("z", it.dataset.id); };
   $("lNowe").onclick = noweZWzoru;
+  $("lMag").onclick = zapytanieNaMagazyn;
 }
 async function noweZWzoru() {
   const rok = L.rokNumeru(U), nr = L.nastepnyNumer(Z.map(z => z.nazwa), rok);
@@ -449,6 +518,7 @@ function renderArkusz() {
     <div class="panel"><div class="hd">
       <div class="toolbar"><a class="btn" href="#zapytania">← Lista</a><h2 class="mono" id="aNazwa">${esc(E.nazwa)}</h2>${isOwner ? `<button class="btn sm" id="aZmienNazwe">Zmień nazwę</button>` : ""}<span class="status" id="aStatus"></span></div>
       <div class="toolbar">
+        <button class="btn" id="aZListy">Dodaj z listy</button>
         <button class="btn" id="aWybor">Wybór dostawcy kolorem</button>
         <button class="btn" id="aMail">Mail do dostawców</button>
         <button class="btn" id="aWaga">Waga dla logistyki</button>
@@ -467,6 +537,12 @@ function renderArkusz() {
   $("aWaga").onclick = async () => { await zapiszTeraz(); go("waga", eId); };
   $("aKoszt").onclick = async () => { await zapiszTeraz(); kosztDlaZapytania(zapById(eId)); };
   $("aXls").onclick = () => eksportArkusza(E);
+  $("aZListy").onclick = async () => {
+    const wyb = await wybierzZListy(); if (!wyb) return;
+    przytnij();
+    for (const x of wyb) E.wiersze.push({ a: L.trescPozycji({ nazwa: x.nazwa, ilZap: x.ilosc, jm: x.jm }), c: {} });
+    zmiana(); rysujArkusz(); toast(`Dodano ${wyb.length} poz.`);
+  };
   $("aUsun") && ($("aUsun").onclick = usunZapytanie);
   $("aZmienNazwe") && ($("aZmienNazwe").onclick = zmienNazwe);
   rysujArkusz(); rysujHistorie();
@@ -870,7 +946,7 @@ async function renderKoszt() {
     <div class="tablebox"><table class="t" style="min-width:1300px"><thead><tr><th>PROJEKT</th><th>KOD KLIENTA</th><th>DATA</th><th>SYMBOL</th><th>NAZWA</th><th>J.M.</th><th class="num">ILOŚĆ W DOK.</th><th class="num">NIEZAREZ.</th><th class="num">NA ZD</th><th class="num">CENA ZAKUPU</th><th>ZAPYTANO</th><th>ARKUSZ ZAPYTANIA</th><th>TREŚĆ W ZAPYTANIU</th></tr></thead><tbody>
     ${p.pozycje.map(x => `<tr><td>${esc(p.id)}</td><td>${esc(p.kod)}</td><td>${fD(p.data)}</td><td class="mono">${esc(x.symbol)}</td><td>${esc(x.nazwa)}</td><td>${esc(x.jm)}</td><td class="num">${L.ogolny(x.ilosc)}</td><td class="num">${L.ogolny(x.niez)}</td><td class="num">${L.ogolny(x.nazd)}</td><td class="num">${x.cz !== undefined ? L.ogolny(x.cz) : ""}</td><td>${esc(x.zapytano)}</td><td>${esc(x.ark)}</td><td>${esc(x.tresc)}</td></tr>`).join("")}</tbody></table></div></details>`;
   $("kPdf").onclick = async () => {
-    try { const pdf = await import("./pdf.js?v=202611061048"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
+    try { const pdf = await import("./pdf.js?v=202611061353"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
     catch (x) { console.error(x); toast("Nie udało się zrobić PDF: " + (x.message || x)); }
   };
 }

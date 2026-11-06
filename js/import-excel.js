@@ -1,6 +1,6 @@
 /* Odczyt pliku „Zapytania Lista 2026.xlsm” (SheetJS) do danych aplikacji.
    Wywołanie: czytajSkoroszyt(XLSX, wb), gdzie wb = XLSX.read(bufor, {cellStyles:true, cellFormula:true, cellComments:true}) */
-import { vbaTrim, ogolny, kolor } from "./logika.js?v=202611061048";
+import { vbaTrim, ogolny, kolor } from "./logika.js?v=202611061353";
 
 export const ARKUSZE_SYSTEMOWE = ["GENERATOR", "USTAWIENIA", "WAGA LOGISTYKA", "WAGI", "PROJEKTY", "KOSZT PROJEKTU", "DRUK KOSZTU", "WZÓR"];
 
