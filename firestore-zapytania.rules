@@ -44,6 +44,11 @@ match /zap_dziennik/{id} {
     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['przejrzane', 'przejrzanoKiedy']);
   allow delete: if false;
 }
+// baza cen materiałów (lista z Subiekta) – właściciel i zastępca; usuwa tylko właściciel
+match /zap_ceny/{id} {
+  allow read, create, update: if zapDostep();
+  allow delete: if zapWlasciciel();
+}
 // config, wagi, generator – właściciel i zastępca; dostep – czyta każde aktywne konto, zmienia tylko właściciel
 match /zap_ustawienia/{d} {
   allow read: if (d == 'dostep' && aktywny()) || zapDostep();

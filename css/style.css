@@ -173,3 +173,13 @@ table.ed input,table.ed select{width:100%;padding:4px 6px;font-size:13px}
 .filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
 table.gen td:nth-child(3),table.gen td:nth-child(14){min-width:230px}
 table.gen td:nth-child(4){min-width:120px}
+/* wykresy cen – kolory serii w stałej kolejności (paleta sprawdzona pod daltonizm) */
+:root{--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#6250d6;--s8:#e34948}
+@media (prefers-color-scheme: dark){:root{--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767}}
+.wyk svg .wg{stroke:var(--line);stroke-width:1}
+.wyk svg .wt{fill:var(--muted);font:11px var(--f-body)}
+.wyk svg .wk-hit{cursor:crosshair}
+.chk{display:inline-flex;gap:5px;align-items:center}
+.chk input{width:auto}
+main > *, #cWidok, #aBox { min-width:0 }
+#cWidok { display:grid; gap:14px }
