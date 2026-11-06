@@ -79,11 +79,15 @@ try {
   await p.setInputFiles("#gFile", plikEksportu); await p.waitForSelector("#dlg[open]");
   ok("eksport wczytany: 2 pozycje do zapytania", (await txt(p, "#dlg")).includes("Do zapytania (brak na magazynie): 2"), (await txt(p, "#dlg")).replace(/\n/g, " ").slice(0, 100));
   await dlgOk(p); await W(500);
+  await p.click("#gDopisz"); await p.waitForSelector("#wlN");
+  await p.fill("#wlN", "Kątownik 50x50x5 S235 6m"); await p.fill("#wlI", "3"); await p.keyboard.press("Enter"); await W(200);
+  await dlgOk(p); await W(1200);
+  ok("dopisano ręcznie do wczytanej listy", (await txt(p, "#widok")).includes("Kątownik 50x50x5 S235 6m"));
   await p.click("#gUtworz"); await p.waitForSelector("#dlg[open]");
   ok("zapytanie utworzone", (await txt(p, "#dlg")).includes(`1-${rok}`));
   await dlgOk(p, "tak"); await p.waitForSelector("#dlg[open]"); await W(200);
   const mail = await txt(p, "#dlg");
-  ok("mail: temat, pozycje, adresy", mail.includes(`Zapytanie ofertowe 1/${rok}`) && mail.includes("Profil 120x80x3 S355 6m- 4 szt") && mail.includes("Obejma rurowa 42,4- 10 szt") && mail.includes("hurtmetal.example"));
+  ok("mail: temat, pozycje, adresy", mail.includes(`Zapytanie ofertowe 1/${rok}`) && mail.includes("Profil 120x80x3 S355 6m- 4 szt") && mail.includes("Obejma rurowa 42,4- 10 szt") && mail.includes("Kątownik 50x50x5 S235 6m- 3 szt") && mail.includes("hurtmetal.example"));
   await dlgOk(p);
   ok("projekt zapisany", await ile("zap_projekty") === 1);
   // 2. arkusz: dostawcy, ceny, formuła, wybór kolorem

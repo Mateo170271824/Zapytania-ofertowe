@@ -208,6 +208,7 @@ function renderGenerator() {
     <div class="toolbar">
       <label class="btn primary filebtn"><span class="nr">1</span>Wczytaj eksport<input type="file" id="gFile" accept=".xlsx,.xls,.xlsm,.csv"></label>
       <button class="btn" id="gMag">Nowe zapytanie (lista / własne pozycje)</button>
+      ${G.wiersze.length ? `<button class="btn" id="gDopisz" title="Dopisz do wczytanej listy pozycje z bazy cen albo wpisane ręcznie">+ Dopisz z bazy / ręcznie</button>` : ""}
       <button class="btn primary" id="gUtworz"><span class="nr">2</span>Utwórz zapytanie</button>
       <button class="btn" id="gMail"><span class="nr">3</span>Mail do dostawców</button>
       <button class="btn" id="gWyczysc"><span class="nr">4</span>Wyczyść listę</button>
@@ -237,6 +238,12 @@ function renderGenerator() {
   </div>`;
   $("gFile").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) wczytajEksportPlik(f); };
   $("gMag").onclick = zapytanieNaMagazyn;
+  $("gDopisz") && ($("gDopisz").onclick = async () => {
+    const wyb = await wybierzZListy(); if (!wyb) return;
+    for (const x of wyb) G.wiersze.push({ symbol: x.symbol || "", nazwa: x.nazwa, jm: x.jm, ilosc: 0, stan: 0, zarez: 0, nazd: 0, niezarez: 0, grupa: L.okreslGrupe(U, x.nazwa), brak: 0, zapytac: "TAK", ilZap: x.ilosc, dopisane: true });
+    await zapiszGenerator(G, [{ p: "dopisano do listy", a: "", b: wyb.map(x => x.nazwa).join(", ") }], "dopisanie pozycji");
+    renderGenerator(); toast(`Dopisano ${wyb.length} poz. (ZAPYTAĆ? = TAK)`);
+  });
   $("gUtworz").onclick = utworzZapytanie;
   $("gMail").onclick = mailOstatnie;
   $("gWyczysc").onclick = async () => { if (await pytanie("Wyczyść listę", "Wyczyścić listę pozycji i pola nad tabelą?", "Wyczyść")) zapiszGenerator({ kod: "", plik: "", ostatnie: "", wiersze: [] }, [{ p: "lista", a: G.wiersze.length + " poz.", b: "" }], "wyczyszczenie listy"); };
@@ -1210,8 +1217,13 @@ function renderUstawienia() {
   const pole = (k, l, opis, typ = "text") => `<label>${l}<input data-u="${k}" value="${esc(UE[k] ?? "")}" ${typ === "tn" ? 'list="tnList"' : ""}><span class="small">${opis}</span></label>`;
   const wagiF = WE.rows.map((r, i) => [r, i]).filter(([r]) => !wagiQ || L.LC(`${r.t} ${r.w} ${r.o} ${r.u}`).includes(L.LC(wagiQ)));
   M().innerHTML = `
-  ${natywna() ? "" : `<div class="panel"><div class="hd"><div><h3>Aplikacja na telefon (Android)</h3><span class="small">Pobierz plik na telefonie i otwórz go – Android zapyta o zgodę na instalację z tego źródła. Aplikacja otwiera zawsze aktualną wersję Zapytań, nie trzeba jej aktualizować. Na iPhonie: Safari → Udostępnij → „Do ekranu początkowego”.</span></div></div>
-    <div class="bd toolbar"><a class="btn" href="https://github.com/Mateo170271824/Zapytania-ofertowe/releases/download/android/Zapytania-ofertowe.apk">Pobierz Zapytania-ofertowe.apk</a></div></div>`}
+  ${natywna() ? "" : `<div class="panel"><div class="hd"><div><h3>Aplikacja na telefon i komputer</h3><span class="small">Dwie wersje do wyboru – obie otwierają zawsze aktualne Zapytania, nie trzeba ich aktualizować.</span></div></div>
+    <div class="bd"><div class="toolbar"><button class="btn primary" id="pwaInst" ${globalThis.zapInstalacja ? "" : "hidden"}>Zainstaluj z przeglądarki</button>
+      <a class="btn" href="https://github.com/Mateo170271824/Zapytania-ofertowe/releases/download/android/Zapytania-ofertowe.apk">Pobierz APK (Android)</a></div>
+      <ul class="small" style="margin:8px 0 0;padding-left:18px">
+        <li><b>Z przeglądarki (jak Kooperacje)</b>: Chrome → menu ⋮ → „Zainstaluj aplikację” (albo „Dodaj do ekranu głównego”). Na komputerze: ikona instalacji na końcu paska adresu. iPhone: Safari → Udostępnij → „Do ekranu początkowego”.</li>
+        <li><b>APK (jak Kalkulator stali)</b>: pobierz plik na telefonie i otwórz – Android zapyta o zgodę na instalację z tego źródła. Pliki (PDF, Excel) zapisujesz przez okno „Udostępnij”.</li>
+      </ul></div></div>`}
   <div class="panel"><div class="hd"><div><h3>Wygląd</h3><span class="small">Kolorystyka aplikacji na tym urządzeniu. Ciemny tryb dopasowuje się do ustawień systemu.</span></div></div>
     <div class="bd motywy" id="uMotyw">${MOTYWY.map(([k, n, th, ak]) => `<button class="motyw" data-m="${k}" aria-pressed="${motyw() === k}"><span class="prev"><span style="background:${th}"></span><span style="background:${ak}"></span><span style="background:#c6efce"></span></span><b>${n}</b></button>`).join("")}</div></div>
   <div class="panel"><div class="hd"><div><h3>Dziennik zmian</h3><span class="small">Kto, kiedy i co zmienił – także zmiany zastępcy w czasie urlopu.${isOwner && LOG.some(l => l.zast && !l.przejrzane) ? ` <b class="red">${LOG.filter(l => l.zast && !l.przejrzane).length} zmian zastępcy do przejrzenia.</b>` : ""}</span></div><a class="btn" href="#dziennik">Otwórz dziennik zmian</a></div></div>
@@ -1270,6 +1282,9 @@ function renderUstawienia() {
   $("pamTab").oninput = e => { const k = e.target.dataset.pam; if (k === undefined) return; const v = e.target.value; WE.pamiec[k] = L.naLiczbe(v).ok && /^[\d,.\s]+$/.test(v) ? L.naLiczbe(v).w : v; ustZm(); };
   $("pamTab").onclick = e => { const b = e.target.closest("[data-pamdel]"); if (!b) return; delete WE.pamiec[b.dataset.pamdel]; ustZm(); renderUstawienia(); };
   $("uZapisz").onclick = zapiszUstawienia;
+  const pwa = $("pwaInst");
+  if (pwa) { document.addEventListener("zap-instalacja", () => { pwa.hidden = false; }, { once: true });
+    pwa.onclick = async () => { const e = globalThis.zapInstalacja; if (!e) return; e.prompt(); const r = await e.userChoice; globalThis.zapInstalacja = null; pwa.hidden = true; if (r.outcome === "accepted") toast("Zainstalowano – ikona jest na ekranie głównym"); }; }
   $("kpXls") && ($("kpXls").onclick = () => pobierzKopie("xlsx"));
   $("kpJson") && ($("kpJson").onclick = () => pobierzKopie("json"));
   $("kpPrzywroc") && ($("kpPrzywroc").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) przywrocKopie(f); });
