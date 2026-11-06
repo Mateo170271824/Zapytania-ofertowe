@@ -250,3 +250,4 @@ rect.sp-p2{--d:1s}rect.sp-p4{--d:1.05s}rect.sp-p9{--d:1.4s}
   #widok .panel>.hd .btn{padding:5px 9px;font-size:12.5px}
   .arkuszbox{max-height:calc(100vh - 120px)}
 }
+.sup-z{border:1px solid var(--line);border-radius:8px;padding:9px 12px;background:var(--surface)}

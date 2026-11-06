@@ -7,8 +7,32 @@ Aplikacja zastępująca plik „Zapytania Lista 2026.xlsm”. Logika jest przeni
 - **Mail do dostawców** – temat i treść z ustawień, dostawcy w UDW, otwarcie w programie pocztowym.
 - **Waga dla logistyki** – wagi z tabeli WAGI (z Kalkulatora stali) wg dostawcy zaznaczonego kolorem.
 - **Koszt projektu** – magazyn wg ceny ostatniego zakupu, zakup wg wybranego dostawcy (profile/rury za mb, reszta za kg), tylko ilość potrzebna na projekt; PDF w układzie „Wycena wewnętrzna”.
+- **Ceny** – baza cen materiałów z listy „Surowiec” z Subiekta i z zakupów (zł/kg, zł/mb, zł/szt), zestawienie roczne.
+- **Zamówienia** – po wyborze dostawcy: zamówiono (nr, data) → dostawa w Logistyce (trafia do biura jako „🛒 do uzupełnienia”) → dostarczono (status wraca z Logistyki).
+- **Kopia zapasowa** – Ustawienia → Kopia zapasowa: Excel do przeglądania i plik .json do przywrócenia. Automat w repo Logistyka robi to samo w każdy poniedziałek (Actions → „Kopia Zapytań ofertowych”, 90 dni).
 - **Zastępstwa** – właściciel nadaje dostęp na czas urlopu, każda zmiana trafia do Dziennika zmian.
 
-Pliki: `index.html`, `css/`, `js/logika.js` (logika makr), `js/import-excel.js` (import pliku .xlsm), `js/app.js` (interfejs), `js/pdf.js` (PDF), `vendor/` (SheetJS, jsPDF, czcionka), `firestore-zapytania.rules` (kopia reguł bazy – obowiązujące są w repo Logistyka).
+## Pliki
+
+| Plik | Co robi |
+|---|---|
+| `js/logika.js` | logika przeniesiona z makr (generator, wagi, koszt projektu) – bez interfejsu |
+| `js/ceny.js` | baza cen: rozpoznanie wyrobu, przeliczenia zł/kg–mb–szt, lista z Subiekta |
+| `js/zamowienia.js` | zamówienia i dostawa w formacie Logistyki |
+| `js/kopia.js` | kopia zapasowa (JSON + Excel); używa jej też automat w repo Logistyka |
+| `js/import-excel.js` | import starego pliku .xlsm |
+| `js/pdf.js` | PDF „Wycena wewnętrzna” |
+| `js/baza.js` | połączenie z Firebase |
+| `js/ui.js` | formatowanie liczb i dat, okna, komunikaty, pliki |
+| `js/app.js` | widoki i obsługa ekranu |
+| `vendor/` | SheetJS, jsPDF, czcionka |
+| `firestore-zapytania.rules` | kopia reguł bazy – obowiązujące są w repo Logistyka (wgrywa je „Wydanie”) |
+
+## Praca nad aplikacją
+
+- Testy: `npm test` (Node 22, bez instalowania pakietów; dane w testach są wymyślone). Automat publikacji uruchamia je przed każdą publikacją – jeśli nie przejdą, strona się nie zmienia.
+- Podgląd lokalnie: `python3 -m http.server` w katalogu repo; `index.html?emu` łączy z emulatorem Firebase (auth 9099, firestore 8085).
+- Wersje plików (`?v=…` w importach) ustawia automat publikacji – nie trzeba ich zmieniać ręcznie.
+- Repo jest publiczne: żadnych plików Excel, eksportów ani kopii z danymi firmy (blokuje je `.gitignore`).
 
 Baza: Firebase projektu Truck App / Kooperacje (te same konta). Dane firmowe (ceny, dostawcy, projekty) są tylko w bazie – nie w tym repozytorium.

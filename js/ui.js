@@ -1,0 +1,45 @@
+/* Drobne narzędzia interfejsu: formatowanie liczb i dat, okna dialogowe, komunikaty, pliki. */
+export const $ = id => document.getElementById(id);
+export const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+export const pad = n => String(n).padStart(2, "0");
+export const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+export const today = () => iso(new Date());
+export const toD = x => !x ? null : x.toDate ? x.toDate() : new Date(x);
+export const fDT = x => { const d = toD(x) || new Date(); return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+export const fD = s => s ? `${s.slice(8, 10)}.${s.slice(5, 7)}.${s.slice(0, 4)}` : "";
+export const clone = o => JSON.parse(JSON.stringify(o ?? null));
+export const uidS = () => Math.random().toString(36).slice(2, 10);
+// liczby jak w Excelu: „1 234,56” (spacja niełamliwa), zawsze z grupowaniem
+export function fmt(x, d = 2, min = d) {
+  if (x === null || x === undefined || x === "" || isNaN(x)) return "";
+  const s = Math.abs(x).toFixed(d);
+  let [c, u] = s.split(".");
+  c = c.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  if (u !== undefined && min < d) { u = u.replace(/0+$/, ""); while (u.length < min) u += "0"; }
+  return (x < 0 && +s !== 0 ? "-" : "") + c + (u ? "," + u : "");
+}
+export const zl = x => fmt(x, 2) + " zł";
+export const ogolnyLiczba = x => typeof x === "number" ? fmt(x, 4, 0) : esc(x);
+export const kolLit = c => { let s = ""; while (c > 0) { const m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); } return s; };
+export const hex = k => (k && k !== -1) ? "#" + k : "";
+export function toast(t) { document.querySelectorAll(".toast").forEach(x => x.remove()); const e = document.createElement("div"); e.className = "toast"; e.textContent = t; document.body.append(e); setTimeout(() => e.remove(), 3500); }
+export function failed(x) { console.error(x); toast("Nie udało się zapisać: " + (x?.code || x?.message || x)); }
+export function show(v) { for (const id of ["v-msg", "v-login", "v-app"]) $(id).hidden = id !== "v-" + v; }
+export function msg(t, s = "") { $("msgT").textContent = t; $("msgS").textContent = s; show("msg"); }
+// okno dialogowe: html formularza, przyciski [{v, t, cls}] -> Promise<{v, form}>
+export function okno(html, przyciski = [{ v: "ok", t: "OK", cls: "primary" }], opcje = {}) {
+  return new Promise(res => {
+    const d = $("dlg"), f = $("dlgF");
+    f.innerHTML = html + `<div class="foot"><span class="grow"></span>${przyciski.map(b => `<button class="btn ${b.cls || ""}" value="${b.v}" ${b.nv ? "formnovalidate" : ""}>${esc(b.t)}</button>`).join("")}</div>`;
+    d.style.width = opcje.szer || "";
+    d.returnValue = "";
+    d.showModal();
+    opcje.poOtwarciu?.(f);
+    d.addEventListener("close", () => res({ v: d.returnValue, form: f }), { once: true });
+  });
+}
+export const pytanie = async (t, b, ok = "OK") => (await okno(`<h3>${esc(t)}</h3><div class="small">${b}</div>`, [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: ok, cls: "primary" }])).v === "ok";
+export async function kopiuj(t) { try { await navigator.clipboard.writeText(t); toast("Skopiowano"); } catch { toast("Zaznacz tekst i skopiuj ręcznie"); } }
+export function pobierzPlik(nazwa, blob) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nazwa; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); }
+export const czytajPlik = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsArrayBuffer(f); });
+

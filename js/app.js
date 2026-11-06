@@ -1,94 +1,16 @@
 import * as L from "./logika.js?v=202611061834";
 import * as I from "./import-excel.js?v=202611061834";
+import * as KP from "./kopia.js?v=202611061834";
+import * as ZM from "./zamowienia.js?v=202611061834";
+import { $, esc, pad, iso, today, toD, fDT, fD, clone, uidS, fmt, zl, ogolnyLiczba, kolLit, hex, toast, failed, show, msg, okno, pytanie, kopiuj, pobierzPlik, czytajPlik } from "./ui.js?v=202611061834";
+import { C, firebase } from "./baza.js?v=202611061834";
 import * as CE from "./ceny.js?v=202611061834";
 
 /* ============================================================ konfiguracja */
-const firebaseConfig = {
-  apiKey: "AIzaSyB8Zi3CTsEJDqnxpt2EpmEN0JKbQZkx9Ik",
-  authDomain: "logistyka-app-41d7a.firebaseapp.com",
-  projectId: "logistyka-app-41d7a",
-  storageBucket: "logistyka-app-41d7a.firebasestorage.app",
-  messagingSenderId: "730726420764",
-  appId: "1:730726420764:web:fbd4a12acd2b5ebdb52ad9"
-};
-const C = { z: "zap_zapytania", p: "zap_projekty", log: "zap_dziennik", u: "zap_ustawienia", c: "zap_ceny" };
 const PALETA = ["00B0F0", "FFFF00", "92D050", "FFC000", "FF99FF", "B4A7D6", "F4B084", "9BC2E6", "C9C9C9", "FF7C80"];
-
-/* ============================================================ pomocnicze */
-const $ = id => document.getElementById(id);
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const pad = n => String(n).padStart(2, "0");
-const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const today = () => iso(new Date());
-const toD = x => !x ? null : x.toDate ? x.toDate() : new Date(x);
-const fDT = x => { const d = toD(x) || new Date(); return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
-const fD = s => s ? `${s.slice(8, 10)}.${s.slice(5, 7)}.${s.slice(0, 4)}` : "";
-const clone = o => JSON.parse(JSON.stringify(o ?? null));
-const uidS = () => Math.random().toString(36).slice(2, 10);
-// liczby jak w Excelu: „1 234,56” (spacja niełamliwa), zawsze z grupowaniem
-export function fmt(x, d = 2, min = d) {
-  if (x === null || x === undefined || x === "" || isNaN(x)) return "";
-  const s = Math.abs(x).toFixed(d);
-  let [c, u] = s.split(".");
-  c = c.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-  if (u !== undefined && min < d) { u = u.replace(/0+$/, ""); while (u.length < min) u += "0"; }
-  return (x < 0 && +s !== 0 ? "-" : "") + c + (u ? "," + u : "");
-}
-const zl = x => fmt(x, 2) + " zł";
-const ogolnyLiczba = x => typeof x === "number" ? fmt(x, 4, 0) : esc(x);
-const kolLit = c => { let s = ""; while (c > 0) { const m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); } return s; };
-const hex = k => (k && k !== -1) ? "#" + k : "";
-function toast(t) { document.querySelectorAll(".toast").forEach(x => x.remove()); const e = document.createElement("div"); e.className = "toast"; e.textContent = t; document.body.append(e); setTimeout(() => e.remove(), 3500); }
-function failed(x) { console.error(x); toast("Nie udało się zapisać: " + (x?.code || x?.message || x)); }
-function show(v) { for (const id of ["v-msg", "v-login", "v-app"]) $(id).hidden = id !== "v-" + v; }
-function msg(t, s = "") { $("msgT").textContent = t; $("msgS").textContent = s; show("msg"); }
-// okno dialogowe: html formularza, przyciski [{v, t, cls}] -> Promise<{v, form}>
-function okno(html, przyciski = [{ v: "ok", t: "OK", cls: "primary" }], opcje = {}) {
-  return new Promise(res => {
-    const d = $("dlg"), f = $("dlgF");
-    f.innerHTML = html + `<div class="foot"><span class="grow"></span>${przyciski.map(b => `<button class="btn ${b.cls || ""}" value="${b.v}" ${b.nv ? "formnovalidate" : ""}>${esc(b.t)}</button>`).join("")}</div>`;
-    d.style.width = opcje.szer || "";
-    d.returnValue = "";
-    d.showModal();
-    opcje.poOtwarciu?.(f);
-    d.addEventListener("close", () => res({ v: d.returnValue, form: f }), { once: true });
-  });
-}
-const pytanie = async (t, b, ok = "OK") => (await okno(`<h3>${esc(t)}</h3><div class="small">${b}</div>`, [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: ok, cls: "primary" }])).v === "ok";
-async function kopiuj(t) { try { await navigator.clipboard.writeText(t); toast("Skopiowano"); } catch { toast("Zaznacz tekst i skopiuj ręcznie"); } }
-function pobierzPlik(nazwa, blob) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nazwa; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); }
-const czytajPlik = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsArrayBuffer(f); });
 
 /* ============================================================ Firebase */
 let B;
-async function firebase() {
-  const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-  const A = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
-  const F = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-  const app = initializeApp(firebaseConfig), auth = A.getAuth(app), db = F.getFirestore(app);
-  if (new URLSearchParams(location.search).has("emu") && ["localhost", "127.0.0.1"].includes(location.hostname)) {
-    A.connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true }); F.connectFirestoreEmulator(db, "127.0.0.1", 8085);
-  }
-  const normLogin = t => String(t || "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ł/g, "l").replace(/[^a-z0-9._-]+/g, ".").replace(/^\.+|\.+$/g, "");
-  const wrapT = T => ({
-    get: async (c, id) => { const s = await T.get(F.doc(db, c, id)); return s.exists() ? s.data() : null; },
-    set: (c, id, d) => T.set(F.doc(db, c, id), d),
-    update: (c, id, d) => T.update(F.doc(db, c, id), d),
-    del: (c, id) => T.delete(F.doc(db, c, id)),
-  });
-  return {
-    onAuth: cb => A.onAuthStateChanged(auth, cb),
-    login: (l, p) => A.signInWithEmailAndPassword(auth, normLogin(l) + "@konta." + firebaseConfig.authDomain, p),
-    logout: () => A.signOut(auth),
-    watch: (c, cb, err) => F.onSnapshot(c === C.log ? F.query(F.collection(db, c), F.orderBy("kiedy", "desc"), F.limit(1500)) : F.collection(db, c), s => cb(s.docs.map(d => ({ _id: d.id, ...d.data() }))), err),
-    watchDoc: (c, id, cb, err) => F.onSnapshot(F.doc(db, c, id), s => cb(s.exists() ? s.data() : null), err),
-    accounts: async () => (await F.getDocs(F.query(F.collection(db, "uzytkownicy"), F.where("rola", "==", "biuro")))).docs.map(d => ({ uid: d.id, ...d.data() })),
-    tx: fn => F.runTransaction(db, T => fn(wrapT(T))),
-    batch: async ops => { const b = F.writeBatch(db); for (const o of ops) { const r = F.doc(db, o.c, o.id); if (o.del) b.delete(r); else if (o.upd) b.update(r, o.d); else b.set(r, o.d); } await b.commit(); },
-    newId: c => F.doc(F.collection(db, c)).id,
-    now: () => F.serverTimestamp(),
-  };
-}
 
 /* ============================================================ stan */
 let me = null, isOwner = false, ownerUid = "", dostep = { zastepcy: {} }, zast = null;
@@ -138,7 +60,7 @@ async function boot() {
     msg("Wczytywanie…");
     user = { uid: u.uid };
     metaSub = B.watchDoc("meta", "init", d => { ownerUid = d?.admin || ""; metaOk = true; decide(); }, x => msg("Nie udało się sprawdzić uprawnień", x?.code || String(x)));
-    B.watchDoc("uzytkownicy", u.uid, d => { if (d) { user.nazwa = d.nazwa || d.login; } if (me) me.nazwa = user.nazwa || me.nazwa; decide(); }, () => {});
+    B.watchDoc("uzytkownicy", u.uid, d => { if (d) { user.nazwa = d.nazwa || d.login; user.login = d.login || ""; user.rola = d.rola || ""; } if (me) me.nazwa = user.nazwa || me.nazwa; decide(); }, () => {});
     dostSub = B.watchDoc(C.u, "dostep", d => { dostep = d || { zastepcy: {} }; dostOk = true; decide(); }, () => { dostep = { zastepcy: {} }; dostOk = true; decide(); });
   });
   setInterval(() => { if (user && metaOk && dostOk) decide(); }, 60000);
@@ -215,6 +137,12 @@ export function diffZap(a, b) {
     if (sv(x.t) !== sv(y.t)) add(adr, x.t, y.t);
     if (L.kolor(x.k) !== L.kolor(y.k)) add(`${adr} kolor (${y.t || x.t || ""})`, x.k ? "#" + x.k : "", y.k ? "#" + y.k : "");
     if (sv(x.m) !== sv(y.m)) add(`${adr} komentarz`, x.m, y.m);
+  }
+  const za = a.zamowienia || {}, zb = b.zamowienia || {};
+  for (const k of new Set([...Object.keys(za), ...Object.keys(zb)])) {
+    const x = za[k] || {}, y = zb[k] || {}, n = y.dostawca || x.dostawca || "#" + k;
+    for (const [f, l] of [["status", "status"], ["nr", "nr zamówienia"], ["data", "data zamówienia"], ["dostawa", "planowana dostawa"], ["uwagi", "uwagi"]])
+      if (sv(x[f]) !== sv(y[f])) add(`zamówienie ${n}: ${l}`, f.startsWith("da") || f === "dostawa" ? fD(x[f]) : x[f], f.startsWith("da") || f === "dostawa" ? fD(y[f]) : y[f]);
   }
   const n = Math.max(a.wiersze?.length || 0, b.wiersze.length);
   for (let i = 0; i < n; i++) {
@@ -489,6 +417,13 @@ async function oknoMail(z) {
 
 /* ============================================================ 2. lista zapytań */
 let listaQ = "";
+// znaczek na liście: ile zamówień złożono / ile dostawców wybrano
+function stanZamowien(z, wyb) {
+  const o = Object.values(z.zamowienia || {}); if (!wyb || !o.length) return "";
+  const dostarczono = o.filter(x => x.status === "dostarczono" || kursySub.get(x.kursId)?.dane?.status === "Dostarczone").length, zam = o.filter(x => x.status === "zamowiono" || x.status === "dostarczono" || x.kursId).length;
+  const [k, t] = dostarczono >= wyb ? ["p-ok", "dostarczono"] : zam >= wyb ? ["p-acc", "zamówiono"] : ["p-warn", `zamówiono ${zam}/${wyb}`];
+  return ` · <span class="pill ${k}">${t}</span>`;
+}
 function renderLista() {
   const q = L.LC(listaQ);
   const lista = zapytaniaPosort().filter(z => !q || L.LC(z.nazwa + " " + z.kod + " " + z.wiersze.map(w => w.a).join(" ") + " " + Object.values(z.naglowki || {}).map(h => h.t).join(" ")).includes(q));
@@ -498,7 +433,7 @@ function renderLista() {
       const poz = z.wiersze.filter(w => L.vbaTrim(w.a)).length, dost = Object.values(z.naglowki || {}).filter(h => h.t).length, wyb = Object.values(z.naglowki || {}).filter(h => L.kolor(h.k) !== -1).length;
       const proj = L.projektDlaZapytania(P, z.nazwa);
       return `<div class="it" data-id="${z._id}"><div><span class="nm mono">${esc(z.nazwa)}</span>${z.kod && !L.LC(z.nazwa).includes(L.LC(z.kod)) ? ` <span class="small">|</span> <b>${esc(z.kod)}</b>` : ""}
-        <div class="small">${poz} poz. · ${dost} dostawców${wyb ? ` · wybrano: ${Object.values(z.naglowki).filter(h => L.kolor(h.k) !== -1).map(h => `<span class="sw" style="background:${hex(h.k)}"></span>${esc(h.t)}`).join(" ")}` : ""}${proj ? " · projekt" : ""}</div></div>
+        <div class="small">${poz} poz. · ${dost} dostawców${wyb ? ` · wybrano: ${Object.values(z.naglowki).filter(h => L.kolor(h.k) !== -1).map(h => `<span class="sw" style="background:${hex(h.k)}"></span>${esc(h.t)}`).join(" ")}` : ""}${proj ? " · projekt" : ""}${stanZamowien(z, wyb)}</div></div>
         <span class="small">›</span></div>`;
     }).join("") || `<div class="empty"><strong>Brak zapytań</strong><span>Utwórz zapytanie w Generatorze albo zaimportuj plik Excel w Ustawieniach.</span></div>`}</div></div>`;
   $("lQ").oninput = e => { listaQ = e.target.value; const pos = e.target.selectionStart; renderLista(); $("lQ").focus(); $("lQ").setSelectionRange(pos, pos); };
@@ -551,6 +486,7 @@ function renderArkusz() {
       <div class="bd notice" id="aWyborInfo" hidden>Tryb wyboru: kliknij cenę dostawcy w wierszu pozycji – pozycja i nagłówek dostawcy dostaną ten sam kolor (jak zaznaczanie kolorem w Excelu). Kliknięcie pozycji w kolumnie A usuwa wybór, kliknięcie nagłówka dostawcy zmienia jego kolor. Bez tego trybu: kliknij cenę i użyj „Wybierz tego dostawcę”.</div>
     </div>
     <div id="aBox"><div class="arkuszbox" id="aGrid"></div></div>
+    <div class="panel" id="aZam"></div>
     <div class="panel"><div class="hd"><h3>Historia zmian</h3></div><div class="log" id="aLog"></div></div>`;
   $("aWybor").onclick = () => { wybor = !wybor; $("aWybor").classList.toggle("on", wybor); $("aBox").classList.toggle("wybor", wybor); $("aWyborInfo").hidden = !wybor; $("cellbar").hidden = true; };
   $("aWybor").classList.toggle("on", wybor); $("aBox").classList.toggle("wybor", wybor); $("aWyborInfo").hidden = !wybor;
@@ -614,6 +550,7 @@ function rysujArkusz() {
   g.style.scrollPaddingLeft = ((innerWidth < 700 ? 26 : 34) + (g.querySelector("thead th:nth-child(2)")?.offsetWidth || 0)) + "px"; g.style.scrollPaddingTop = "34px";   // aktywna komórka nie chowa się pod kolumną A ani nagłówkiem
   g.querySelectorAll("textarea").forEach(autoH);
   legenda();
+  rysujZamowienia();
   status();
   $("aDodajKol").onclick = () => { const c = L.ostKolumna(E) + 1; E.naglowki = E.naglowki || {}; E.naglowki[Math.max(c, 2)] = { t: "" }; zmiana(); rysujArkusz(); g.querySelector(`input[data-r="1"][data-c="${Math.max(c, 2)}"]`)?.focus(); };
 }
@@ -626,6 +563,81 @@ document.addEventListener("input", e => {
   if (!th || c < 2) return;
   const w = innerWidth < 700 ? szerKol(el.value.length * 0.85, 96, 170) : szerKol(el.value.length, 160, 320);
   if (w > th.offsetWidth) { th.style.width = w + "px"; th.style.minWidth = w + "px"; }
+});
+/* ---------- zamówienia: wybrano → zamówiono → dostawa w Logistyce → dostarczono */
+const kursySub = new Map();      // kursId -> {unsub, dane}
+function obserwujKurs(id) {
+  if (!id || kursySub.has(id)) return;
+  const o = { dane: null, unsub: null };
+  kursySub.set(id, o);
+  o.unsub = B.watchDoc("kursy", id, d => { o.dane = d; if (widok.nazwa === "z") rysujZamowienia(); }, () => { o.dane = { brakDostepu: true }; });
+}
+function rysujZamowienia() {
+  const el = $("aZam"); if (!el || !E) return;
+  const grupy = ZM.grupyZamowien(E, { wagi: L.slownikWag(W), pamiec: W.pamiec || {} });
+  if (!grupy.length) { el.innerHTML = `<div class="hd"><h3>Zamówienia</h3><span class="small">Pojawią się tu, gdy wybierzesz dostawców kolorem.</span></div>`; return; }
+  const Z_ = E.zamowienia || {};
+  el.innerHTML = `<div class="hd"><h3>Zamówienia</h3><span class="small">Wybrany dostawca → zamówienie → dostawa w Logistyce (biuro uzupełnia transport i awizo) → dostarczono.</span></div>
+    <div class="bd" style="display:grid;gap:10px">${grupy.map(g => {
+      const z = Z_[g.kolor] || {}, kurs = z.kursId ? kursySub.get(z.kursId)?.dane : null;
+      if (z.kursId) obserwujKurs(z.kursId);
+      const dost = kurs && !kurs.brakDostepu && kurs.status === "Dostarczone";
+      const st = dost || z.status === "dostarczono" ? ["p-ok", "dostarczono"] : z.kursId ? ["p-acc", "dostawa w Logistyce"] : z.status === "zamowiono" ? ["p-warn", "zamówiono"] : ["p-idle", "wybrano – nie zamówiono"];
+      const t = g.wagaKg != null ? L.vbaRound(g.wagaKg / 1000, 3) : null;
+      return `<div class="sup-z" data-k="${g.kolor}" style="border-left:6px solid #${g.kolor}"><div class="toolbar" style="justify-content:space-between">
+          <div><b>${esc(ZM.pelnaNazwa(g.dostawca, U))}</b> <span class="pill ${st[0]}">${st[1]}</span>
+            <div class="small">${g.pozycje.length} poz.${t != null ? ` · ok. ${fmt(t, 3)} t` : ""}${g.bezWagi ? ` (${g.bezWagi} bez wagi)` : ""}${z.nr ? ` · zam. <b>${esc(z.nr)}</b>` : ""}${z.data ? ` z ${fD(z.data)}` : ""}${z.dostawa ? ` · dostawa ${fD(z.dostawa)}` : ""}${kurs && !kurs.brakDostepu ? ` · Logistyka: ${esc(kurs.status || "")}${kurs.zal ? `, załadunek ${fD(kurs.zal)}` : ""}${kurs.dst ? `, dostawa ${fD(kurs.dst)}` : ""}` : ""}</div></div>
+          <div class="toolbar">
+            <button class="btn sm ${z.status ? "" : "primary"}" data-za="zam">${z.status ? "Popraw zamówienie" : "Zamówiono"}</button>
+            ${z.status && !z.kursId ? `<button class="btn sm primary" data-za="kurs">Utwórz dostawę w Logistyce</button>` : ""}
+            ${z.status && !dost && z.status !== "dostarczono" ? `<button class="btn sm" data-za="dost">Dostarczono</button>` : ""}
+            ${z.status ? `<button class="btn sm ghost" data-za="cofnij" title="Wyczyść status zamówienia">✕</button>` : ""}
+          </div></div>
+        <div class="small" style="margin-top:4px">${g.pozycje.map(p => esc(p.w.a)).join(" · ")}</div></div>`;
+    }).join("")}</div>`;
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("#aZam [data-za]"); if (!b || !E) return;
+  const k = b.closest("[data-k]").dataset.k, a = b.dataset.za;
+  const grupy = ZM.grupyZamowien(E, { wagi: L.slownikWag(W), pamiec: W.pamiec || {} }), g = grupy.find(x => x.kolor === k); if (!g) return;
+  E.zamowienia = E.zamowienia || {};
+  const z = E.zamowienia[k] || { dostawca: ZM.pelnaNazwa(g.dostawca, U) };
+  if (a === "zam") {
+    const r = await okno(`<h3>Zamówienie: ${esc(z.dostawca)}</h3><div class="grid3"><label>Nr zamówienia (np. ZD)<input name="nr" value="${esc(z.nr || "")}"></label><label>Data zamówienia<input name="data" type="date" value="${esc(z.data || today())}"></label><label>Planowana dostawa<input name="dostawa" type="date" value="${esc(z.dostawa || "")}"></label><label class="full">Uwagi<input name="uwagi" value="${esc(z.uwagi || "")}"></label></div>`,
+      [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Zapisz", cls: "primary" }]);
+    if (r.v !== "ok") return;
+    Object.assign(z, { nr: r.form.nr.value.trim(), data: r.form.data.value, dostawa: r.form.dostawa.value, uwagi: r.form.uwagi.value.trim(), status: z.status === "dostarczono" ? "dostarczono" : "zamowiono" });
+    E.zamowienia[k] = z; zmiana(); rysujZamowienia(); return;
+  }
+  if (a === "dost") { z.status = "dostarczono"; E.zamowienia[k] = z; zmiana(); rysujZamowienia(); return; }
+  if (a === "cofnij") { if (!(await pytanie("Wyczyścić zamówienie?", `${esc(z.dostawca)}${z.kursId ? "<br>Dostawa w Logistyce zostaje – usuń ją tam, jeśli trzeba." : ""}`, "Wyczyść"))) return; delete E.zamowienia[k]; zmiana(); rysujZamowienia(); return; }
+  if (a === "kurs") {
+    const wT = g.wagaKg != null ? L.vbaRound(g.wagaKg / 1000, 3) : "";
+    const r = await okno(`<h3>Dostawa w Logistyce: ${esc(z.dostawca)}</h3>
+      <p class="small">Powstanie dostawa oznaczona „🛒 do uzupełnienia” – biuro w Logistyce uzupełni transport i awizo, jak przy dostawach z Kooperacji.</p>
+      <div class="grid3"><label>Dostawca<input name="kontr" value="${esc(z.dostawca)}" required></label><label>Nr (zamówienia)<input name="nr" value="${esc(z.nr || E.nazwa)}" required></label><label>Projekt / kod<input name="proj" value="${esc(E.kod || "")}"></label>
+      <label>Transport<select name="tr"><option value="Dostawca">transport dostawcy</option><option value="Spedycja">spedycja</option><option value="Skavska">nasz transport</option></select></label>
+      <label>Załadunek (data)<input name="zal" type="date" value="${esc(z.dostawa || "")}"></label><label>Waga [t]<input name="waga" inputmode="decimal" value="${wT === "" ? "" : L.ogolny(wT)}"></label>
+      <label class="full">Uwagi<input name="uwagi" value="${esc(`Zapytanie ${E.nazwa}${z.uwagi ? " · " + z.uwagi : ""}`)}"></label></div>
+      <div class="small">Pozycje (${g.pozycje.length}): ${esc(g.pozycje.map(p => p.w.a).join(" · "))}</div>`, [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Utwórz dostawę", cls: "primary" }]);
+    if (r.v !== "ok") return;
+    await zapiszTeraz();
+    const f = r.form, wg = L.naLiczbe(f.waga.value);
+    const { kurs, koszt } = ZM.kursLogistyki({ nr: f.nr.value.trim(), proj: f.proj.value.trim(), kontr: f.kontr.value.trim(), transport: f.tr.value, zal: f.zal.value, dst: "", wagaT: wg.ok ? wg.w : null,
+      pozycje: g.pozycje.map(p => ZM.pozycjaDoKursu(p.w.a)), uwagi: f.uwagi.value.trim(), kto: user.login || me.nazwa, nazwa: me.nazwa }, B.now());
+    const kursId = B.newId("kursy"), logId = B.newId(C.log);
+    try {
+      await B.tx(async t => {
+        const cur = await t.get(C.z, eId); if (!cur) throw new Error("zapytanie zniknęło");
+        const zam = { ...(cur.zamowienia || {}) }; zam[k] = { ...(zam[k] || z), kursId, status: zam[k]?.status || "zamowiono", dostawca: z.dostawca };
+        t.set("kursy", kursId, kurs); t.set("koszty", kursId, koszt);
+        t.set(C.z, eId, czysc({ ...cur, zamowienia: zam, wersja: (cur.wersja || 0) + 1, ostatniWpis: logId, zmieniono: B.now(), zmienil: me.uid, zmienilNazwa: me.nazwa }));
+        t.set(C.log, logId, wpis("zapytanie", eId, E.nazwa, "zmiana", [{ p: `dostawa w Logistyce (${z.dostawca})`, a: "", b: `${kurs.nr} · ${g.pozycje.length} poz.${kurs.waga ? ` · ${L.ogolny(kurs.waga)} t` : ""}` }]));
+      });
+      E.zamowienia = E.zamowienia || {}; E.zamowienia[k] = { ...z, kursId, status: z.status || "zamowiono" }; eWersja += 1;
+      toast("Dostawa jest w Logistyce – biuro uzupełni transport i awizo"); rysujZamowienia();
+    } catch (x) { if (String(x?.code).includes("permission")) okno(`<h3>Brak uprawnień</h3><p>Dostawy w Logistyce może tworzyć tylko konto biura. To konto nie ma tej roli.</p>`); else failed(x); }
+  }
 });
 function legenda() {
   const el = $("aLegenda"); if (!el) return;
@@ -657,7 +669,7 @@ async function zapiszArkusz() {
   if (!eDirty || !E) return;
   if (eZapis) return eZapis;
   przytnij();
-  const dane = { nazwa: E.nazwa, kod: E.kod ?? "", kodM: E.kodM, dataZap: E.dataZap, naglowki: E.naglowki || {}, wiersze: E.wiersze, numer: E.numer ?? null, rok: E.rok ?? null, kolejnosc: E.kolejnosc ?? 0 };
+  const dane = { nazwa: E.nazwa, kod: E.kod ?? "", kodM: E.kodM, dataZap: E.dataZap, zamowienia: E.zamowienia || {}, naglowki: E.naglowki || {}, wiersze: E.wiersze, numer: E.numer ?? null, rok: E.rok ?? null, kolejnosc: E.kolejnosc ?? 0 };
   eDirty = false; status("zapisywanie…");
   eZapis = zapiszDok(C.z, eId, dane, { typ: "zapytanie", etykieta: E.nazwa, diffFn: diffZap, wersja: eWersja })
     .then(r => {
@@ -1231,6 +1243,9 @@ function renderUstawienia() {
   <div class="panel"><div class="hd"><h3>Zapamiętane odpowiedzi (sztuki w paczce, wymiary arkuszy)</h3></div>
     <div class="tablebox"><table class="t ed"><thead><tr><th>PACZKA / ARKUSZ (typ|wymiar|dł.)</th><th>WARTOŚĆ</th><th></th></tr></thead><tbody id="pamTab">
     ${Object.entries(WE.pamiec).map(([k, v]) => `<tr><td class="mono">${esc(k)}</td><td><input data-pam="${esc(k)}" value="${esc(typeof v === "number" ? L.ogolny(v) : v)}"></td><td><button class="btn sm" data-pamdel="${esc(k)}">✕</button></td></tr>`).join("")}</tbody></table></div></div>
+  ${isOwner ? `<div class="panel"><div class="hd"><div><h3>Kopia zapasowa</h3><span class="small">Automatycznie co tydzień (poniedziałek rano) robi się kopia w repozytorium Logistyka – Actions → „Kopia Zapytań ofertowych”, trzymana 90 dni. Tu możesz pobrać kopię w każdej chwili.</span></div></div>
+    <div class="bd toolbar"><button class="btn" id="kpXls">Pobierz kopię (Excel – do przeglądania)</button><button class="btn" id="kpJson">Pobierz kopię (plik do przywrócenia)</button>
+      <label class="btn danger filebtn">Przywróć z kopii<input type="file" id="kpPrzywroc" accept=".json,application/json"></label></div></div>` : ""}
   ${isOwner ? `<div class="panel"><div class="hd"><h3>Import z pliku Excel</h3></div><div class="bd"><div class="drop"><b>Wgraj „Zapytania Lista 2026.xlsm”</b><span>Przeniesie wszystkie zapytania (ceny, kolory wyboru, komentarze), projekty, tabelę wag, zapamiętane paczki, listę generatora i ustawienia. Plik jest czytany w przeglądarce – nie trafia nigdzie poza bazę aplikacji.</span>
     <label class="btn primary filebtn">Wybierz plik<input type="file" id="impFile" accept=".xlsm,.xlsx"></label></div></div></div>` : ""}`;
   M().querySelectorAll("[data-u]").forEach(el => el.oninput = () => { UE[el.dataset.u] = el.value; ustZm(); });
@@ -1249,6 +1264,9 @@ function renderUstawienia() {
   $("pamTab").oninput = e => { const k = e.target.dataset.pam; if (k === undefined) return; const v = e.target.value; WE.pamiec[k] = L.naLiczbe(v).ok && /^[\d,.\s]+$/.test(v) ? L.naLiczbe(v).w : v; ustZm(); };
   $("pamTab").onclick = e => { const b = e.target.closest("[data-pamdel]"); if (!b) return; delete WE.pamiec[b.dataset.pamdel]; ustZm(); renderUstawienia(); };
   $("uZapisz").onclick = zapiszUstawienia;
+  $("kpXls") && ($("kpXls").onclick = () => pobierzKopie("xlsx"));
+  $("kpJson") && ($("kpJson").onclick = () => pobierzKopie("json"));
+  $("kpPrzywroc") && ($("kpPrzywroc").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) przywrocKopie(f); });
   $("impFile") && ($("impFile").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) importExcel(f); });
 }
 const MOTYWY = [["granat", "Granat (obecny)", "#366092", "#366092"], ["grafit", "Grafit – neutralny", "#3d434a", "#3d434a"], ["pomarancz", "Grafit z pomarańczem", "#33383d", "#c2410c"], ["zielen", "Zieleń stalowa", "#2e3b36", "#2f6b4f"]];
@@ -1281,6 +1299,45 @@ async function zapiszUstawienia() {
     if (zm.length) await zapiszUst("config", UE, "USTAWIENIA", zm);
     if (zmW.length) await zapiszUst("wagi", WE, "WAGI", zmW);
     ustDirty = false; toast("Zapisano ustawienia"); renderUstawienia();
+  } catch (x) { failed(x); }
+}
+// ---------- kopia zapasowa
+async function biezacaKopia() {
+  startCeny(); await czekajNa(() => cenyZal, 8000);
+  return KP.kopiaJSON({ zapytania: Z, projekty: P, ceny: CEN, ustawienia: U, wagi: W, generator: G, cenyMeta });
+}
+async function pobierzKopie(rodzaj) {
+  const k = await biezacaKopia(), d = today();
+  if (rodzaj === "json") pobierzPlik(`zapytania-kopia-${d}.json`, new Blob([JSON.stringify(k)], { type: "application/json" }));
+  else XLSX.writeFile(KP.kopiaExcel(XLSX, k), `zapytania-kopia-${d}.xlsx`);
+  toast("Pobrano kopię");
+}
+async function przywrocKopie(f) {
+  let k;
+  try { k = JSON.parse(new TextDecoder().decode(await czytajPlik(f))); } catch { return okno(`<h3>Przywracanie</h3><p>To nie jest poprawny plik kopii (.json).</p>`); }
+  const bl = KP.sprawdzKopie(k); if (bl) return okno(`<h3>Przywracanie</h3><p>${esc(bl)}</p>`);
+  const r = await okno(`<h3>Przywrócić kopię z ${fDT(k.kiedy)}?</h3><ul><li>Zapytań: <b>${k.zapytania.length}</b>, projektów: <b>${k.projekty.length}</b>, pozycji w cenach: <b>${(k.ceny || []).length}</b></li></ul>
+    <p class="notice bad">Obecne zapytania, projekty, ceny, ustawienia i wagi zostaną <b>zastąpione</b> stanem z kopii. Dziennik zmian i zastępstwa zostają bez zmian. Wpis o przywróceniu trafi do dziennika.</p>
+    <p class="small">Dla pewności najpierw pobierz kopię obecnego stanu.</p>`, [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Przywróć", cls: "danger" }]);
+  if (r.v !== "ok") return;
+  toast("Przywracam…");
+  try {
+    startCeny(); await czekajNa(() => cenyZal, 8000);
+    const del = [...Z.map(z => ({ c: C.z, id: z._id, del: true })), ...P.map(p => ({ c: C.p, id: p._id, del: true })), ...CEN.map(d => ({ c: C.c, id: d._id, del: true }))];
+    for (let i = 0; i < del.length; i += 450) await B.batch(del.slice(i, i + 450));
+    const zKopii = c => o => { const { id, d } = KP.dokumentZKopii(o); return { c, id: id || B.newId(c), d: czysc(d) }; };
+    const docs = [...k.zapytania.map(zKopii(C.z)), ...k.projekty.map(zKopii(C.p))];
+    // zapytania i projekty muszą mieć wpis w dzienniku w tej samej paczce
+    for (let i = 0; i < docs.length; i += 400) {
+      const lid = B.newId(C.log), part = docs.slice(i, i + 400).map(o => ({ ...o, d: { ...o.d, ostatniWpis: lid, wersja: (o.d.wersja || 0) + 1 } }));
+      await B.batch([...part, { c: C.log, id: lid, d: wpis("import", "", f.name, "przywrócenie", [{ p: "przywrócono z kopii", a: "", b: `${fDT(k.kiedy)} – ${part.length} dokumentów` }]) }]);
+    }
+    const ceny = (k.ceny || []).map(zKopii(C.c));
+    for (let i = 0; i < ceny.length; i += 450) await B.batch(ceny.slice(i, i + 450));
+    const ust = [{ c: C.u, id: "config", d: czysc(k.ustawienia || {}) }, { c: C.u, id: "wagi", d: czysc(k.wagi || { rows: [], pamiec: {} }) }, { c: C.u, id: "generator", d: czysc(k.generator || {}) }];
+    if (k.cenyMeta) ust.push({ c: C.u, id: "ceny", d: czysc(k.cenyMeta) });
+    await B.batch(ust);
+    ustDirty = false; toast("Przywrócono kopię"); go("zapytania");
   } catch (x) { failed(x); }
 }
 async function importExcel(f) {
