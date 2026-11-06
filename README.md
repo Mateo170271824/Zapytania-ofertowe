@@ -9,6 +9,6 @@ Aplikacja zastępująca plik „Zapytania Lista 2026.xlsm”. Logika jest przeni
 - **Koszt projektu** – magazyn wg ceny ostatniego zakupu, zakup wg wybranego dostawcy (profile/rury za mb, reszta za kg), tylko ilość potrzebna na projekt; PDF w układzie „Wycena wewnętrzna”.
 - **Zastępstwa** – właściciel nadaje dostęp na czas urlopu, każda zmiana trafia do Dziennika zmian.
 
-Pliki: `index.html`, `css/`, `js/logika.js` (logika makr), `js/import-excel.js` (import pliku .xlsm), `js/app.js` (interfejs), `js/pdf.js` (PDF), `vendor/` (SheetJS, jsPDF, czcionka), `firestore-zapytania.rules` (reguły bazy – do wgrania w repo Logistyka).
+Pliki: `index.html`, `css/`, `js/logika.js` (logika makr), `js/import-excel.js` (import pliku .xlsm), `js/app.js` (interfejs), `js/pdf.js` (PDF), `vendor/` (SheetJS, jsPDF, czcionka), `firestore-zapytania.rules` (kopia reguł bazy – obowiązujące są w repo Logistyka).
 
 Baza: Firebase projektu Truck App / Kooperacje (te same konta). Dane firmowe (ceny, dostawcy, projekty) są tylko w bazie – nie w tym repozytorium.

@@ -1,20 +1,16 @@
-// ===== Zapytania ofertowe =====
-// Fragment do wklejenia w firestore.rules (repo Logistyka), wewnątrz bloku:
-//   match /databases/{database}/documents { ... }
-//
-// Właściciel = konto zapisane jako admin w meta/init (to samo co w Kooperacjach).
-// Zastępca = konto wpisane w zap_ustawienia/dostep.zastepcy, tylko w dniach od–do
-// i tylko dopóki dostęp nie został odebrany.
-// Każdy zapis zapytania lub projektu musi mieć wpis w dzienniku w tej samej transakcji.
-// Wpisów w dzienniku nie da się usunąć ani zmienić (poza odhaczeniem „przejrzane” przez właściciela).
-
+// KOPIA – obowiązujące reguły są w repo Logistyka (firestore.rules), wgrywa je automat „Wydanie”.
+// Ten fragment korzysta z funkcji admin() i aktywny() zdefiniowanych w regułach Logistyki.
+// ===== Zapytania ofertowe (osobna aplikacja na tej samej bazie, repo Zapytania-ofertowe) =====
+// Właściciel = administrator. Zastępca = aktywne konto wpisane w zap_ustawienia/dostep.zastepcy,
+// tylko w dniach od–do i dopóki dostęp nie został odebrany.
+// Każdy zapis zapytania/projektu musi mieć wpis w dzienniku w tej samej transakcji,
+// a wpisów dziennika nie da się usunąć ani zmienić (poza odhaczeniem „przejrzane” przez właściciela).
 function zapWlasciciel() {
-  return request.auth != null
-    && request.auth.uid == get(/databases/$(database)/documents/meta/init).data.admin;
+  return admin();
 }
 function zapZastepca() {
   let z = get(/databases/$(database)/documents/zap_ustawienia/dostep).data.zastepcy;
-  return request.auth != null
+  return aktywny()
     && request.auth.uid in z
     && !('odwolano' in z[request.auth.uid])
     && request.time >= z[request.auth.uid].od
@@ -27,7 +23,6 @@ function zapZDziennikiem() {
   return existsAfter(/databases/$(database)/documents/zap_dziennik/$(request.resource.data.ostatniWpis))
     && (resource == null || request.resource.data.ostatniWpis != resource.data.ostatniWpis);
 }
-
 match /zap_zapytania/{id} {
   allow read: if zapDostep();
   allow create, update: if zapDostep() && zapZDziennikiem();
@@ -49,8 +44,8 @@ match /zap_dziennik/{id} {
     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['przejrzane', 'przejrzanoKiedy']);
   allow delete: if false;
 }
-// config, wagi, generator – właściciel i zastępca; dostep – tylko właściciel
+// config, wagi, generator – właściciel i zastępca; dostep – czyta każde aktywne konto, zmienia tylko właściciel
 match /zap_ustawienia/{d} {
-  allow read: if (d == 'dostep' && request.auth != null) || zapDostep();
+  allow read: if (d == 'dostep' && aktywny()) || zapDostep();
   allow write: if (d == 'dostep' && zapWlasciciel()) || (d != 'dostep' && zapDostep());
 }
