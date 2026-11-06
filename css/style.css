@@ -116,9 +116,9 @@ table.ark th,table.ark td{border-right:1px solid var(--grid);border-bottom:1px s
 table.ark thead th{position:sticky;top:0;z-index:3;background:var(--gridhd);color:var(--muted);font:500 11px var(--f-mono);text-align:center;padding:3px 0;letter-spacing:0}
 table.ark .rn{position:sticky;left:0;z-index:2;background:var(--gridhd);color:var(--muted);font:500 11px var(--f-mono);text-align:center;width:34px;min-width:34px;vertical-align:middle}
 table.ark thead th.rn{z-index:4}
-table.ark td.a{position:sticky;left:34px;z-index:1;background:var(--surface);min-width:300px;width:300px}
-@media (max-width:700px){table.ark td.a{min-width:180px;width:180px}}
-table.ark td.c{min-width:118px;width:118px}
+table.ark td.a{position:sticky;left:34px;z-index:1;background:var(--surface)}
+
+table.ark td.c{min-width:118px}
 table.ark tr.r1 td{font-weight:600}
 table.ark input,table.ark textarea{display:block;width:100%;border:0;border-radius:0;background:transparent;color:inherit;padding:5px 7px;font:inherit;font-size:13.5px;min-height:30px}
 table.ark textarea{resize:none;overflow:hidden;line-height:1.35;white-space:pre-wrap}
@@ -184,9 +184,9 @@ table.gen td:nth-child(4){min-width:120px}
 main > *, #cWidok, #aBox { min-width:0 }
 #cWidok { display:grid; gap:14px }
 /* szersze komórki */
-table.ark td.a{min-width:400px;width:400px}
-@media (max-width:700px){table.ark td.a{min-width:220px;width:220px}}
-table.ark td.c{min-width:160px;width:160px}
+table.ark td.a{min-width:200px}
+
+table.ark td.c{min-width:160px}
 table.ark input,table.ark textarea{font-size:14px;padding:6px 9px}
 table.t td{padding:7px 11px}
 table.t td.strong:first-child,#cRows td:first-child{min-width:240px}

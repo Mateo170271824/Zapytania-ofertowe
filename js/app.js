@@ -1,6 +1,6 @@
-import * as L from "./logika.js";
-import * as I from "./import-excel.js";
-import * as CE from "./ceny.js";
+import * as L from "./logika.js?v=202611061040";
+import * as I from "./import-excel.js?v=202611061040";
+import * as CE from "./ceny.js?v=202611061040";
 
 /* ============================================================ konfiguracja */
 const firebaseConfig = {
@@ -488,7 +488,10 @@ function rysujArkusz() {
   const g = $("aGrid"); if (!g || !E) return;
   const ostK = Math.max(L.ostKolumna(E), 4), nW = Math.max(E.wiersze.length + 3, 12);
   const naglowki = E.naglowki || {};
-  let h = `<table class="ark"><thead><tr><th class="rn"></th><th style="position:sticky;left:34px;z-index:4">A</th>${Array.from({ length: ostK - 1 }, (_, i) => `<th>${kolLit(i + 2)}</th>`).join("")}<th></th></tr></thead><tbody>`;
+  // szerokość kolumny dopasowana do najdłuższego tekstu (nagłówek albo komórka), 160–320 px
+  const szer = c => { let n = String(naglowki[c]?.t ?? "").length; for (const w of E.wiersze) n = Math.max(n, wartWyswietl(w.c?.[c], c).length); return szerKol(n, 160, 320); };
+  const szerA = szerKol(Math.max(String(E.kod ?? "").length, ...E.wiersze.map(w => Math.max(...String(w.a ?? "").split("\n").map(l => l.length)))), innerWidth < 700 ? 200 : 300, innerWidth < 700 ? 260 : 560);
+  let h = `<table class="ark"><thead><tr><th class="rn"></th><th style="position:sticky;left:34px;z-index:4;width:${szerA}px;min-width:${szerA}px">A</th>${Array.from({ length: ostK - 1 }, (_, i) => { const w = szer(i + 2); return `<th style="width:${w}px;min-width:${w}px">${kolLit(i + 2)}</th>`; }).join("")}<th></th></tr></thead><tbody>`;
   // wiersz 1: kod klienta + dostawcy
   h += `<tr class="r1"><td class="rn">1</td><td class="a" data-r="1" data-c="1">${E.kodM ? '<span class="km" title="' + esc(E.kodM) + '"></span>' : ""}<input value="${esc(E.kod)}" data-r="1" data-c="1" aria-label="A1 kod klienta"></td>`;
   for (let c = 2; c <= ostK; c++) {
@@ -509,11 +512,22 @@ function rysujArkusz() {
   }
   h += `</tbody></table><datalist id="dostList">${(U.dostawcy || []).map(d => `<option value="${esc(L.LC(d.dostawca))}">`).join("")}</datalist>`;
   g.innerHTML = h;
+  g.style.scrollPaddingLeft = (34 + szerA) + "px"; g.style.scrollPaddingTop = "34px";   // aktywna komórka nie chowa się pod kolumną A ani nagłówkiem
   g.querySelectorAll("textarea").forEach(autoH);
   legenda();
   status();
   $("aDodajKol").onclick = () => { const c = L.ostKolumna(E) + 1; E.naglowki = E.naglowki || {}; E.naglowki[Math.max(c, 2)] = { t: "" }; zmiana(); rysujArkusz(); g.querySelector(`input[data-r="1"][data-c="${Math.max(c, 2)}"]`)?.focus(); };
 }
+// autodopasowanie: ok. 8,6 px na znak + marginesy
+function szerKol(znakow, min, max) { return Math.min(max, Math.max(min, Math.round(znakow * 8.6 + 30))); }
+// w trakcie pisania kolumna rośnie, gdy tekst się nie mieści
+document.addEventListener("input", e => {
+  const el = e.target.closest?.("table.ark input"); if (!el) return;
+  const c = +el.dataset.c, th = el.closest("table").querySelectorAll("thead th")[c];
+  if (!th || c < 2) return;
+  const w = szerKol(el.value.length, 160, 320);
+  if (w > th.offsetWidth) { th.style.width = w + "px"; th.style.minWidth = w + "px"; }
+});
 function legenda() {
   const el = $("aLegenda"); if (!el) return;
   const wyb = Object.entries(E.naglowki || {}).filter(([, h]) => L.kolor(h.k) !== -1);
@@ -847,7 +861,7 @@ async function renderKoszt() {
     <div class="tablebox"><table class="t" style="min-width:1300px"><thead><tr><th>PROJEKT</th><th>KOD KLIENTA</th><th>DATA</th><th>SYMBOL</th><th>NAZWA</th><th>J.M.</th><th class="num">ILOŚĆ W DOK.</th><th class="num">NIEZAREZ.</th><th class="num">NA ZD</th><th class="num">CENA ZAKUPU</th><th>ZAPYTANO</th><th>ARKUSZ ZAPYTANIA</th><th>TREŚĆ W ZAPYTANIU</th></tr></thead><tbody>
     ${p.pozycje.map(x => `<tr><td>${esc(p.id)}</td><td>${esc(p.kod)}</td><td>${fD(p.data)}</td><td class="mono">${esc(x.symbol)}</td><td>${esc(x.nazwa)}</td><td>${esc(x.jm)}</td><td class="num">${L.ogolny(x.ilosc)}</td><td class="num">${L.ogolny(x.niez)}</td><td class="num">${L.ogolny(x.nazd)}</td><td class="num">${x.cz !== undefined ? L.ogolny(x.cz) : ""}</td><td>${esc(x.zapytano)}</td><td>${esc(x.ark)}</td><td>${esc(x.tresc)}</td></tr>`).join("")}</tbody></table></div></details>`;
   $("kPdf").onclick = async () => {
-    try { const pdf = await import("./pdf.js"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
+    try { const pdf = await import("./pdf.js?v=202611061040"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
     catch (x) { console.error(x); toast("Nie udało się zrobić PDF: " + (x.message || x)); }
   };
 }
