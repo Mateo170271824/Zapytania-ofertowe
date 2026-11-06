@@ -1,6 +1,6 @@
-import * as L from "./logika.js?v=202611061440";
-import * as I from "./import-excel.js?v=202611061440";
-import * as CE from "./ceny.js?v=202611061440";
+import * as L from "./logika.js?v=202611061530";
+import * as I from "./import-excel.js?v=202611061530";
+import * as CE from "./ceny.js?v=202611061530";
 
 /* ============================================================ konfiguracja */
 const firebaseConfig = {
@@ -967,7 +967,7 @@ async function renderKoszt() {
     <div class="tablebox"><table class="t" style="min-width:1300px"><thead><tr><th>PROJEKT</th><th>KOD KLIENTA</th><th>DATA</th><th>SYMBOL</th><th>NAZWA</th><th>J.M.</th><th class="num">ILOŚĆ W DOK.</th><th class="num">NIEZAREZ.</th><th class="num">NA ZD</th><th class="num">CENA ZAKUPU</th><th>ZAPYTANO</th><th>ARKUSZ ZAPYTANIA</th><th>TREŚĆ W ZAPYTANIU</th></tr></thead><tbody>
     ${p.pozycje.map(x => `<tr><td>${esc(p.id)}</td><td>${esc(p.kod)}</td><td>${fD(p.data)}</td><td class="mono">${esc(x.symbol)}</td><td>${esc(x.nazwa)}</td><td>${esc(x.jm)}</td><td class="num">${L.ogolny(x.ilosc)}</td><td class="num">${L.ogolny(x.niez)}</td><td class="num">${L.ogolny(x.nazd)}</td><td class="num">${x.cz !== undefined ? L.ogolny(x.cz) : ""}</td><td>${esc(x.zapytano)}</td><td>${esc(x.ark)}</td><td>${esc(x.tresc)}</td></tr>`).join("")}</tbody></table></div></details>`;
   $("kPdf").onclick = async () => {
-    try { const pdf = await import("./pdf.js?v=202611061440"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
+    try { const pdf = await import("./pdf.js?v=202611061530"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
     catch (x) { console.error(x); toast("Nie udało się zrobić PDF: " + (x.message || x)); }
   };
 }
@@ -1193,6 +1193,8 @@ function renderUstawienia() {
   const pole = (k, l, opis, typ = "text") => `<label>${l}<input data-u="${k}" value="${esc(UE[k] ?? "")}" ${typ === "tn" ? 'list="tnList"' : ""}><span class="small">${opis}</span></label>`;
   const wagiF = WE.rows.map((r, i) => [r, i]).filter(([r]) => !wagiQ || L.LC(`${r.t} ${r.w} ${r.o} ${r.u}`).includes(L.LC(wagiQ)));
   M().innerHTML = `
+  <div class="panel"><div class="hd"><div><h3>Wygląd</h3><span class="small">Kolorystyka aplikacji na tym urządzeniu. Ciemny tryb dopasowuje się do ustawień systemu.</span></div></div>
+    <div class="bd motywy" id="uMotyw">${MOTYWY.map(([k, n, th, ak]) => `<button class="motyw" data-m="${k}" aria-pressed="${motyw() === k}"><span class="prev"><span style="background:${th}"></span><span style="background:${ak}"></span><span style="background:#c6efce"></span></span><b>${n}</b></button>`).join("")}</div></div>
   <div class="panel"><div class="hd"><div><h3>Dziennik zmian</h3><span class="small">Kto, kiedy i co zmienił – także zmiany zastępcy w czasie urlopu.${isOwner && LOG.some(l => l.zast && !l.przejrzane) ? ` <b class="red">${LOG.filter(l => l.zast && !l.przejrzane).length} zmian zastępcy do przejrzenia.</b>` : ""}</span></div><a class="btn" href="#dziennik">Otwórz dziennik zmian</a></div></div>
   <div class="panel"><div class="hd"><h2>Ustawienia generatora</h2><div class="toolbar"><span class="status" id="uStatus">${ustDirty ? "niezapisane zmiany" : ""}</span><button class="btn primary" id="uZapisz" ${ustDirty ? "" : "disabled"}>Zapisz ustawienia</button></div></div>
     <div class="bd grid3">
@@ -1248,6 +1250,14 @@ function renderUstawienia() {
   $("uZapisz").onclick = zapiszUstawienia;
   $("impFile") && ($("impFile").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) importExcel(f); });
 }
+const MOTYWY = [["granat", "Granat (obecny)", "#366092", "#366092"], ["grafit", "Grafit – neutralny", "#3d434a", "#3d434a"], ["pomarancz", "Grafit z pomarańczem", "#33383d", "#c2410c"], ["zielen", "Zieleń stalowa", "#2e3b36", "#2f6b4f"]];
+function motyw() { try { return localStorage.getItem("zap_motyw") || "granat"; } catch { return "granat"; } }
+function ustawMotyw(m) {
+  try { localStorage.setItem("zap_motyw", m); } catch {}
+  if (m === "granat") delete document.documentElement.dataset.motyw; else document.documentElement.dataset.motyw = m;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", (MOTYWY.find(x => x[0] === m) || MOTYWY[0])[2]);
+}
+document.addEventListener("click", e => { const b = e.target.closest("#uMotyw [data-m]"); if (!b) return; ustawMotyw(b.dataset.m); document.querySelectorAll("#uMotyw [data-m]").forEach(x => x.setAttribute("aria-pressed", x === b)); });
 function tabelaEd(k, tytul, kol) {
   const opt = { tn: '<datalist id="tnL2"><option value="TAK"><option value="NIE"></datalist>', pk: "", gr: "" };
   return `<div class="panel"><div class="hd"><h3>${tytul}</h3><button class="btn sm" data-dodaj="${k}">+ Wiersz</button></div>

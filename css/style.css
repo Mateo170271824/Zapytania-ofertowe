@@ -1,7 +1,7 @@
 /* Kolory jak w pliku Excel: granatowe nagłówki tabel (#366092), zielona/czerwona cena, kolory dostawców */
 :root{
   --bg:#f2f3f1; --surface:#ffffff; --sunk:#e8eaed; --line:#d0d5dc; --fg:#1b2028; --muted:#5b6270;
-  --accent:#366092; --accent-fg:#ffffff; --accent-soft:#dde7f3;
+  --accent:#366092; --accent-fg:#ffffff; --accent-soft:#dde7f3; --th-bg:#366092; --th-fg:#ffffff; --th-line:#2c4f78;
   --ok:#2e7a3b; --ok-soft:#e0f0e2; --warn:#946000; --warn-soft:#faeed4; --bad:#b0332a; --bad-soft:#f7e0dd; --idle-soft:#e7e8ec;
   --grid:#d6dbe1; --gridhd:#eef1f5; --tak:#ddebf7; --zolty:#fff2a8;
   --min-bg:#c6efce; --min-fg:#006100; --max-bg:#ffc7ce; --max-fg:#9c0006;
@@ -65,7 +65,7 @@ label input,label select,label textarea{width:100%}
 table{border-collapse:collapse;width:100%}
 th{font-size:11.5px;letter-spacing:.03em;font-weight:600;text-align:left;padding:7px 9px;white-space:nowrap}
 td{padding:6px 9px;vertical-align:top}
-table.t th{background:#366092;color:#fff;border:1px solid #2c4f78}
+table.t th{background:var(--th-bg);color:var(--th-fg);border:1px solid var(--th-line)}
 table.t td{border:1px solid var(--grid)}
 table.t tr.click{cursor:pointer}
 table.t tr.click:hover td{background:var(--sunk)}
@@ -202,7 +202,7 @@ table.gen td:nth-child(3),table.gen td:nth-child(14){min-width:280px}
 #splash.sp-off{opacity:0;pointer-events:none}
 #splash .sp-ark{width:min(300px,72vw);height:auto;filter:drop-shadow(0 14px 30px rgb(20 40 70 / .18));animation:sp-pop .45s cubic-bezier(.2,.9,.3,1.25) both}
 .sp-sheet{fill:#fff;stroke:#c9d3df}
-.sp-head{fill:#366092}
+.sp-head{fill:var(--th-bg)}
 .sp-lin{stroke:#dfe5ec;stroke-width:1}
 .sp-poz{fill:#c3ccd7;animation:sp-in .3s ease both .35s}
 .sp-cel{transform-box:fill-box;transform-origin:center;animation:sp-pop .35s cubic-bezier(.2,.9,.3,1.4) both}
@@ -222,3 +222,20 @@ rect.sp-p2{--d:1s}rect.sp-p4{--d:1.05s}rect.sp-p9{--d:1.4s}
 @keyframes sp-rysuj{to{stroke-dashoffset:0}}
 @keyframes sp-up{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){#splash *{animation:none!important}.sp-tick{stroke-dashoffset:0}rect.sp-win{fill:#c6efce}}
+
+/* ===== motywy wyglądu (Ustawienia → Wygląd). Domyślny: granat. */
+@media (prefers-color-scheme: dark){:root{--th-bg:#2a4566;--th-line:#1f3550}}
+/* Grafit – neutralny, bez koloru marki */
+:root[data-motyw="grafit"]{--tak:#eceef0;--accent:#3d434a;--accent-fg:#fff;--accent-soft:#e6e8eb;--th-bg:#3d434a;--th-fg:#fff;--th-line:#2c3136}
+@media (prefers-color-scheme: dark){:root[data-motyw="grafit"]{--tak:#2a2e35;--accent:#c9ced4;--accent-fg:#15181c;--accent-soft:#2d3239;--th-bg:#353b42;--th-line:#262b31}}
+/* Grafit z pomarańczem – akcent jak znacznik na ofercie */
+:root[data-motyw="pomarancz"]{--tak:#fdf0e7;--accent:#c2410c;--accent-fg:#fff;--accent-soft:#fbe6d8;--th-bg:#33383d;--th-fg:#fff;--th-line:#23272b}
+@media (prefers-color-scheme: dark){:root[data-motyw="pomarancz"]{--tak:#33251c;--accent:#f08a4b;--accent-fg:#1a0f08;--accent-soft:#3b2416;--th-bg:#2a2f35;--th-line:#1f2328}}
+/* Zieleń stalowa */
+:root[data-motyw="zielen"]{--tak:#e5f3ec;--accent:#2f6b4f;--accent-fg:#fff;--accent-soft:#dcefe5;--th-bg:#2e3b36;--th-fg:#fff;--th-line:#222c28}
+@media (prefers-color-scheme: dark){:root[data-motyw="zielen"]{--tak:#1d2d26;--accent:#7cc4a0;--accent-fg:#0d1a14;--accent-soft:#1b3328;--th-bg:#26312d;--th-line:#1c2522}}
+.motywy{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.motyw{display:grid;gap:8px;text-align:left;font:inherit;color:inherit;background:var(--surface);border:2px solid var(--line);border-radius:10px;padding:10px;cursor:pointer}
+.motyw[aria-pressed="true"]{border-color:var(--accent)}
+.motyw .prev{display:grid;grid-template-columns:2fr 1fr 1fr;gap:3px;border-radius:6px;overflow:hidden}
+.motyw .prev span{height:16px}

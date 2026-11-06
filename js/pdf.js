@@ -1,7 +1,7 @@
 /* PDF kosztu projektu – układ jak „Wycena wewnętrzna” (makro KosztDoPDF):
    A4 poziomo, logo Skavska, „Dokument wewnętrzny”, tytuł KOSZT PROJEKTU, wskaźniki, sekcje z tabelami, stopka „Strona X/N”. */
 import { PDF_FONT_R, PDF_FONT_B } from "../vendor/pdf-czcionki.js";
-import { vbaRound } from "./logika.js?v=202611061440";
+import { vbaRound } from "./logika.js?v=202611061530";
 
 const NAVY = [18, 69, 125], SZARY = [100, 113, 120], TEKST = [33, 37, 41], CZERW = [192, 57, 43], CZARNY = [20, 24, 28];
 const NAGL_BG = [227, 232, 242], ZEBRA = [247, 250, 250], SUMA_BG = [242, 245, 247], LINIA = [209, 217, 219];
