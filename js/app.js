@@ -4,6 +4,7 @@ import * as KP from "./kopia.js?v=202611061834";
 import * as ZM from "./zamowienia.js?v=202611061834";
 import { $, esc, pad, iso, today, toD, fDT, fD, clone, uidS, fmt, zl, ogolnyLiczba, kolLit, hex, toast, failed, show, msg, okno, pytanie, kopiuj, pobierzPlik, czytajPlik } from "./ui.js?v=202611061834";
 import { C, firebase } from "./baza.js?v=202611061834";
+import { trescPomocy, START_ZASTEPCY } from "./pomoc.js?v=202611061834";
 import * as CE from "./ceny.js?v=202611061834";
 
 /* ============================================================ konfiguracja */
@@ -32,6 +33,7 @@ $("loginF").addEventListener("submit", async e => {
   try { await B.login($("lgLogin").value, $("lgPass").value); } catch { $("lgErr").hidden = false; $("lgErr").textContent = "Nieprawidłowy login lub hasło."; }
 });
 $("btnOut").onclick = () => B.logout();
+$("btnPomoc").onclick = () => okno(trescPomocy(widok.nazwa, isOwner), [{ v: "ok", t: "Zamknij", cls: "primary" }], { szer: "min(720px, 96vw)" });
 function stopAll() { subs.forEach(u => { try { u(); } catch {} }); subs = []; started = false; }
 function decide() {
   if (!user || !metaOk || !dostOk) return;
@@ -48,6 +50,8 @@ function decide() {
   $("whoRole").innerHTML = isOwner ? `<span class="pill p-acc">właściciel</span>` : `<span class="pill p-warn">zastępstwo do ${fD(doDnia(zast))}</span>`;
   $("tabDostep").hidden = !isOwner;
   $("zastBanner").hidden = isOwner;
+  // zastępca przy pierwszym wejściu w danym zastępstwie dostaje skrót „od czego zacząć”
+  if (!isOwner) { const kl = "zap_start_" + user.uid + "_" + (toD(zast.od)?.getTime() || 0); let byl = true; try { byl = !!localStorage.getItem(kl); localStorage.setItem(kl, "1"); } catch {} if (!byl) setTimeout(() => okno(START_ZASTEPCY, [{ v: "ok", t: "Zaczynam", cls: "primary" }]), 300); }
   if (!isOwner) $("zastBanner").innerHTML = `<b>Dostęp tymczasowy do ${fD(doDnia(zast))}.</b> Każda Twoja zmiana zapisuje się w Dzienniku zmian z Twoim nazwiskiem i godziną. Nie możesz usuwać zapytań ani projektów.`;
   if (!started) { started = true; startData(); }
   render();

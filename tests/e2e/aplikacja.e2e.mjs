@@ -1,0 +1,159 @@
+// Test ekranowy całej aplikacji na emulatorze Firebase i wymyślonych danych.
+// Uruchomienie: npm run test:e2e (wymaga Javy; instaluje firebase-tools, playwright).
+import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
+import { doc, setDoc, getDocs, deleteDoc, collection } from "firebase/firestore";
+import { createRequire } from "node:module";
+import { readFileSync, mkdtempSync, writeFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import vm from "node:vm";
+
+const require = createRequire(import.meta.url);
+const { chromium } = require("playwright");
+const TU = dirname(fileURLToPath(import.meta.url)), REPO = join(TU, "..", "..");
+const ADRES = process.env.ADRES || "http://localhost:8766/index.html?emu";
+const PID = "logistyka-app-41d7a", DOM = "@konta." + PID + ".firebaseapp.com";
+const TMP = mkdtempSync(join(tmpdir(), "zap-e2e-"));
+const kt = { console }; kt.self = kt; vm.createContext(kt);
+vm.runInContext(readFileSync(join(REPO, "vendor/xlsx.full.min.js"), "utf8"), kt);
+const XLSX = kt.XLSX;
+
+const env = await initializeTestEnvironment({ projectId: PID, firestore: { rules: readFileSync(join(TU, "firestore.rules"), "utf8"), host: "127.0.0.1", port: 8085 } });
+const baza = fn => env.withSecurityRulesDisabled(c => fn(c.firestore()));
+const ile = async kol => { let n = 0; await baza(async db => { n = (await getDocs(collection(db, kol))).size; }); return n; };
+async function konto(login) {
+  const r = await fetch(`http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=x`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: login + DOM, password: "haslo123", returnSecureToken: true }) });
+  return (await r.json()).localId;
+}
+const U = { wlasciciel: await konto("wlasciciel"), zastepca: await konto("zastepca") };
+await baza(async db => {
+  await setDoc(doc(db, "meta/init"), { admin: U.wlasciciel });
+  await setDoc(doc(db, "uzytkownicy/" + U.wlasciciel), { login: "wlasciciel", nazwa: "Jan Testowy", rola: "biuro", aktywny: true });
+  await setDoc(doc(db, "uzytkownicy/" + U.zastepca), { login: "zastepca", nazwa: "Ewa Zastępcza", rola: "biuro", aktywny: true });
+  await setDoc(doc(db, "zap_ustawienia/config"), {
+    prog: 0, naZD: "TAK", osobno: "NIE", krok: 1, start: 2, rok: "", kodWNazwie: "NIE",
+    temat: "Zapytanie ofertowe {NUMER}", poczatek: "Dzień dobry,\nproszę o ofertę:", koniec: "Pozdrawiam", doKogo: "",
+    grupy: [{ grupa: "PROFILE", kolejnosc: 1, uwzgl: "TAK", min: 0, gdyZero: "" }, { grupa: "INNE", kolejnosc: 2, uwzgl: "TAK", min: 0, gdyZero: "" }],
+    slowa: [{ slowo: "PROFIL", grupa: "PROFILE" }],
+    dostawcy: [{ dostawca: "Stal-Pol", email: "oferty@stalpol.example", wysylaj: "TAK", osoba: "" }, { dostawca: "Hurt Metal", email: "biuro@hurtmetal.example", wysylaj: "TAK", osoba: "" }],
+  });
+  await setDoc(doc(db, "zap_ustawienia/wagi"), { rows: [{ t: "PROFIL", w: "120x80x3", kg: 8.75, o: "", u: "" }], pamiec: {} });
+});
+// eksport braków z Subiekta (wymyślony)
+const plikEksportu = join(TMP, "Braki TESTKL.xlsx");
+{
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ["Symbol", "Nazwa", "J.m.", "Stan", "Niezarezerwowane", "Na ZD", "Cena netto"],
+    ["T-001", "Profil 120x80x3 S355 6m", "szt", 2, -4, 0, 300],
+    ["T-002", "Blacha 3mm S235 1500x3000", "szt", 8, 5, 0, 420],
+    ["T-003", "Obejma rurowa 42,4", "szt", 0, -10, 0, 4.5],
+  ]), "Arkusz1");
+  writeFileSync(plikEksportu, Buffer.from(XLSX.write(wb, { type: "array", bookType: "xlsx" })));
+}
+
+const FB = join(REPO, "node_modules/firebase/");
+const b = await chromium.launch();
+const bledy = [], wyniki = [];
+const ok = (n, v, extra = "") => wyniki.push((v ? "OK    " : "BŁĄD  ") + n + (extra ? "  → " + extra : ""));
+async function strona(szer = 1366) {
+  const ctx = await b.newContext({ viewport: { width: szer, height: 900 }, acceptDownloads: true });
+  if (existsSync(FB + "firebase-app.js")) await ctx.route(/gstatic\.com\/firebasejs\/10\.12\.2\/(.*)$/, r => r.fulfill({ path: FB + r.request().url().split("/").pop(), contentType: "application/javascript" }));
+  const p = await ctx.newPage();
+  p.on("pageerror", e => bledy.push("PAGEERR " + e.message));
+  p.on("console", m => { if (m.type() === "error" && !/fonts|TUNNEL|ERR_|favicon/.test(m.text())) bledy.push("CONSOLE " + m.text()); });
+  await p.goto(ADRES);
+  return p;
+}
+const W = ms => new Promise(r => setTimeout(r, ms));
+async function zaloguj(p, l) { await p.waitForSelector("#v-login:not([hidden])"); await p.fill("#lgLogin", l); await p.fill("#lgPass", "haslo123"); await p.click("#loginF button"); await p.waitForSelector("#v-app:not([hidden])", { timeout: 15000 }); }
+const dlgOk = async (p, v = "ok") => { await p.waitForSelector("#dlg[open]"); await p.click(`#dlg button[value="${v}"]`); await W(150); };
+const txt = async (p, s) => (await p.$eval(s, e => e.innerText)).replace(/ /g, " ");
+const rok = new Date().getFullYear();
+
+try {
+  let p = await strona(); await zaloguj(p, "wlasciciel");
+  // 1. generator
+  await p.click("#tabs [data-v=generator]"); await W(400);
+  await p.setInputFiles("#gFile", plikEksportu); await p.waitForSelector("#dlg[open]");
+  ok("eksport wczytany: 2 pozycje do zapytania", (await txt(p, "#dlg")).includes("Do zapytania (brak na magazynie): 2"), (await txt(p, "#dlg")).replace(/\n/g, " ").slice(0, 100));
+  await dlgOk(p); await W(500);
+  await p.click("#gUtworz"); await p.waitForSelector("#dlg[open]");
+  ok("zapytanie utworzone", (await txt(p, "#dlg")).includes(`1-${rok}`));
+  await dlgOk(p, "tak"); await p.waitForSelector("#dlg[open]"); await W(200);
+  const mail = await txt(p, "#dlg");
+  ok("mail: temat, pozycje, adresy", mail.includes(`Zapytanie ofertowe 1/${rok}`) && mail.includes("Profil 120x80x3 S355 6m- 4 szt") && mail.includes("Obejma rurowa 42,4- 10 szt") && mail.includes("hurtmetal.example"));
+  await dlgOk(p);
+  ok("projekt zapisany", await ile("zap_projekty") === 1);
+  // 2. arkusz: dostawcy, ceny, formuła, wybór kolorem
+  await p.click("#tabs [data-v=zapytania]"); await W(300); await p.fill("#lQ", `1-${rok}`); await p.keyboard.press("Enter"); await p.waitForSelector("#aGrid table");
+  await p.click('#aGrid input[data-r="1"][data-c="2"]'); await p.keyboard.type("Stal-Pol"); await p.keyboard.press("Enter");
+  await p.keyboard.type("58"); await p.keyboard.press("Enter"); await p.keyboard.type("=2,5*2"); await p.keyboard.press("Enter");
+  await p.click('#aGrid input[data-r="1"][data-c="3"]'); await p.keyboard.type("Hurt Metal"); await p.keyboard.press("Enter");
+  await p.keyboard.type("55,5"); await p.keyboard.press("Enter"); await p.keyboard.type("4,8"); await p.keyboard.press("Enter"); await W(1500);
+  const b3 = await p.$eval('#aGrid input[data-r="3"][data-c="2"]', e => e.value.replace(/ /g, " "));
+  ok("formuła =2,5*2 → 5,00 zł", b3 === "5,00 zł", b3);
+  await p.click("#aWybor"); await p.click('#aGrid td[data-r="2"][data-c="3"]'); await p.click('#aGrid td[data-r="3"][data-c="3"]'); await W(300); await p.click("#aWybor"); await W(1800);
+  ok("historia arkusza", (await txt(p, "#aLog")).includes("wybór dostawcy"));
+  // 3. zamówienie i dostawa w Logistyce
+  const karta = "#aZam .sup-z";
+  await p.waitForSelector(karta);
+  ok("panel zamówień: Hurt Metal", (await txt(p, karta)).includes("Hurt Metal"), (await txt(p, karta)).split("\n")[0]);
+  await p.click(karta + ' [data-za="zam"]'); await p.waitForSelector("#dlg[open]");
+  await p.fill('#dlg input[name="nr"]', "ZD 7/" + rok); await p.fill('#dlg input[name="dostawa"]', `${rok}-12-01`); await dlgOk(p); await W(2000);
+  ok("zamówiono", (await txt(p, karta)).includes("ZD 7/" + rok));
+  await p.click(karta + ' [data-za="kurs"]'); await p.waitForSelector("#dlg[open]"); await dlgOk(p); await W(2500);
+  await baza(async db => { const s = await getDocs(collection(db, "kursy")); const d = s.docs[0]?.data() || {};
+    ok("dostawa w Logistyce (do uzupełnienia)", s.size === 1 && d.doUzup === true && d.kontr === "Hurt Metal" && d.pozycje?.length === 2, JSON.stringify({ kontr: d.kontr, poz: d.pozycje?.length, waga: d.waga })); });
+  // 4. zapytanie na magazyn z ręczną pozycją
+  await p.click("#tabs [data-v=zapytania]"); await W(400);
+  await p.click("#lMag"); await p.waitForSelector("#wlN");
+  await p.fill("#wlN", "Wypałka trapez 240x80x5"); await p.fill("#wlI", "50"); await p.keyboard.press("Enter"); await W(200);
+  await dlgOk(p); await p.waitForSelector("#dlg[open]");
+  ok("magazyn: kod MAG", (await p.$eval('#dlg input[name="k"]', e => e.value)) === "MAG");
+  await dlgOk(p); await p.waitForSelector("#dlg[open]"); await dlgOk(p, "tak"); await p.waitForSelector("#dlg[open]");
+  ok("magazyn: mail z ręczną pozycją", (await txt(p, "#dlg")).includes("Wypałka trapez 240x80x5- 50 szt"));
+  await dlgOk(p); await p.waitForSelector("#aGrid table"); await W(800);
+  ok("dwa zapytania, jeden projekt", await ile("zap_zapytania") === 2 && await ile("zap_projekty") === 1);
+  // 5. pomoc
+  await p.click("#btnPomoc"); await p.waitForSelector("#dlg[open]");
+  ok("pomoc dla arkusza", (await txt(p, "#dlg")).includes("Arkusz zapytania"));
+  await dlgOk(p);
+  // 6. kopia zapasowa i przywrócenie
+  await p.click("#tabs [data-v=ustawienia]"); await W(600);
+  const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#kpJson")]);
+  const plikKopii = join(TMP, "kopia.json"); await dl.saveAs(plikKopii);
+  const k = JSON.parse(readFileSync(plikKopii, "utf8"));
+  ok("kopia: 2 zapytania, 1 projekt", k.zapytania.length === 2 && k.projekty.length === 1);
+  const [dlx] = await Promise.all([p.waitForEvent("download"), p.click("#kpXls")]);
+  const plikXls = join(TMP, "kopia.xlsx"); await dlx.saveAs(plikXls);
+  const wbk = XLSX.read(readFileSync(plikXls), { type: "buffer" });
+  ok("kopia Excel: arkusz zapytania", wbk.SheetNames.includes(`1-${rok}`), [...wbk.SheetNames].join(", "));
+  await baza(async db => { await deleteDoc(doc(db, "zap_zapytania/" + k.zapytania.find(z => z.kod !== "MAG")._doc)); }); await W(1000);
+  await p.setInputFiles("#kpPrzywroc", plikKopii); await dlgOk(p);
+  await p.waitForFunction(() => location.hash === "#zapytania", null, { timeout: 30000 }); await W(1500);
+  ok("przywrócono z kopii", await ile("zap_zapytania") === 2);
+  // 7. zastępstwo
+  await p.click("#tabs [data-v=dostep]"); await W(800);
+  await p.selectOption("#gKto", U.zastepca); const d = new Date(); d.setDate(d.getDate() + 5); await p.fill("#gDo", d.toISOString().slice(0, 10));
+  await p.click("#gF button[type=submit]"); await W(1200);
+  ok("zastępstwo nadane", (await txt(p, "#gRows")).includes("aktywne"));
+  await p.click("#btnOut"); await p.close();
+  p = await strona(390); await zaloguj(p, "zastepca");
+  await p.waitForSelector("#dlg[open]", { timeout: 5000 });
+  ok("zastępca: skrót „od czego zacząć”", (await txt(p, "#dlg")).includes("od czego zacząć")); await dlgOk(p);
+  await p.click("#tabs [data-v=zapytania]"); await W(500); await p.fill("#lQ", `1-${rok}`); await p.keyboard.press("Enter"); await p.waitForSelector("#aGrid table");
+  await p.click('#aGrid input[data-r="2"][data-c="2"]'); await p.keyboard.type("57"); await p.keyboard.press("Enter"); await W(1800);
+  ok("zastępca zapisał cenę", (await p.$eval("#aStatus", e => e.textContent)).includes("zapisano"));
+  await p.click("#btnOut"); await p.close();
+  p = await strona(); await zaloguj(p, "wlasciciel"); await W(1500);
+  ok("właściciel widzi zmianę zastępcy", (await p.$eval("#logCnt", e => e.hidden ? "" : e.textContent)) === "1");
+} catch (e) { ok("przebieg testu", false, e.message.split("\n")[0]); }
+
+console.log(wyniki.join("\n"));
+if (bledy.length) console.log("\nBłędy strony:\n" + bledy.slice(0, 10).join("\n"));
+const zle = wyniki.filter(r => !r.startsWith("OK")).length + bledy.length;
+console.log(`\n${wyniki.length - wyniki.filter(r => !r.startsWith("OK")).length}/${wyniki.length} OK`);
+await b.close(); await env.cleanup();
+process.exit(zle ? 1 : 0);

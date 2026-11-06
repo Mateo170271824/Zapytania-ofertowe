@@ -251,3 +251,11 @@ rect.sp-p2{--d:1s}rect.sp-p4{--d:1.05s}rect.sp-p9{--d:1.4s}
   .arkuszbox{max-height:calc(100vh - 120px)}
 }
 .sup-z{border:1px solid var(--line);border-radius:8px;padding:9px 12px;background:var(--surface)}
+
+/* pomoc */
+.pomoc{font-size:14px;line-height:1.5}
+.pomoc ul,.pomoc ol{margin:6px 0 10px;padding-left:20px}
+.pomoc li{margin:4px 0}
+.pomoc-inne{margin-top:12px;border-top:1px solid var(--line, #ddd);padding-top:8px}
+.pomoc-inne summary{cursor:pointer;font-weight:600}
+.pomoc-inne h4{margin:14px 0 4px}

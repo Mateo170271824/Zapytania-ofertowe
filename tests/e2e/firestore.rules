@@ -1,0 +1,10 @@
+rules_version = '2';
+// Tylko do testów ekranowych na emulatorze: każde zalogowane konto może wszystko.
+// Prawdziwe reguły (i ich testy) są w repo Logistyka – firestore.rules + tests/rules.test.mjs.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

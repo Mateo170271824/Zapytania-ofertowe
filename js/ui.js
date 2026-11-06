@@ -24,7 +24,7 @@ export const kolLit = c => { let s = ""; while (c > 0) { const m = (c - 1) % 26;
 export const hex = k => (k && k !== -1) ? "#" + k : "";
 export function toast(t) { document.querySelectorAll(".toast").forEach(x => x.remove()); const e = document.createElement("div"); e.className = "toast"; e.textContent = t; document.body.append(e); setTimeout(() => e.remove(), 3500); }
 export function failed(x) { console.error(x); toast("Nie udało się zapisać: " + (x?.code || x?.message || x)); }
-export function show(v) { for (const id of ["v-msg", "v-login", "v-app"]) $(id).hidden = id !== "v-" + v; }
+export function show(v) { for (const id of ["v-msg", "v-login", "v-app"]) $(id).hidden = id !== "v-" + v; document.dispatchEvent(new Event("zap-gotowa")); }
 export function msg(t, s = "") { $("msgT").textContent = t; $("msgS").textContent = s; show("msg"); }
 // okno dialogowe: html formularza, przyciski [{v, t, cls}] -> Promise<{v, form}>
 export function okno(html, przyciski = [{ v: "ok", t: "OK", cls: "primary" }], opcje = {}) {

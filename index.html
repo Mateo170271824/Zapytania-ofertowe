@@ -53,7 +53,7 @@
 <div id="v-app" class="wrap" hidden>
   <header class="top">
     <div><h1>Zapytania ofertowe</h1><p class="sub" id="hSub"></p></div>
-    <div class="who"><span id="whoName"></span><span id="whoRole"></span><button class="btn sm" id="btnOut">Wyloguj</button></div>
+    <div class="who"><span id="whoName"></span><span id="whoRole"></span><button class="btn sm" id="btnPomoc" title="Jak działa ta zakładka">Pomoc</button><button class="btn sm" id="btnOut">Wyloguj</button></div>
   </header>
   <div id="zastBanner" class="notice" hidden></div>
   <nav class="tabs" id="tabs">
@@ -71,7 +71,14 @@
 <div id="cellbar" class="cellbar" hidden></div>
 
 <script src="vendor/xlsx.full.min.js"></script>
-<script>(function(){var s=document.getElementById("splash");function off(){if(s&&s.parentNode){s.classList.add("sp-off");setTimeout(function(){s.remove()},400)}}s.addEventListener("click",off);setTimeout(off,matchMedia("(prefers-reduced-motion: reduce)").matches?300:2700);})();</script>
+<script>
+// ekran startowy: znika po animacji, ale nie wcześniej niż aplikacja jest gotowa (logowanie albo dane); najpóźniej po 6 s; kliknięcie pomija
+(function(){var s=document.getElementById("splash"),t0=Date.now(),min=matchMedia("(prefers-reduced-motion: reduce)").matches?1600:2700,gotowa=false;
+function off(){if(s&&s.parentNode){s.classList.add("sp-off");setTimeout(function(){s.remove()},400)}}
+function moze(){if(gotowa)setTimeout(off,Math.max(0,min-(Date.now()-t0)))}
+document.addEventListener("zap-gotowa",function(){gotowa=true;moze()},{once:true});
+s.addEventListener("click",off);setTimeout(off,6000);})();
+</script>
 <script type="module" src="js/app.js?v=202611061834"></script>
 </body>
 </html>

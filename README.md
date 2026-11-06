@@ -26,11 +26,15 @@ Aplikacja zastępująca plik „Zapytania Lista 2026.xlsm”. Logika jest przeni
 | `js/ui.js` | formatowanie liczb i dat, okna, komunikaty, pliki |
 | `js/app.js` | widoki i obsługa ekranu |
 | `vendor/` | SheetJS, jsPDF, czcionka |
-| `firestore-zapytania.rules` | kopia reguł bazy – obowiązujące są w repo Logistyka (wgrywa je „Wydanie”) |
+| `js/pomoc.js` | pomoc w aplikacji (przycisk „Pomoc”) i skrót dla zastępcy |
+| `tests/` | testy obliczeń (`npm test`) i test ekranowy całej aplikacji (`tests/e2e`) |
 
 ## Praca nad aplikacją
 
-- Testy: `npm test` (Node 22, bez instalowania pakietów; dane w testach są wymyślone). Automat publikacji uruchamia je przed każdą publikacją – jeśli nie przejdą, strona się nie zmienia.
+- Testy obliczeń: `npm test` (Node 22, bez instalowania pakietów).
+- Test ekranowy: `npm run test:e2e` – emulator bazy + przeglądarka przechodzą całą ścieżkę: eksport z Subiekta → zapytanie → mail → ceny i wybór dostawcy → zamówienie i dostawa w Logistyce → zapytanie na magazyn → kopia i przywrócenie → zastępstwo. Wymaga Javy oraz `npm i --no-save firebase-tools@13.29.1 firebase@10.12.2 @firebase/rules-unit-testing@3.0.4 playwright@1.63.0`.
+- Automat publikacji uruchamia oba rodzaje testów przed każdą publikacją – jeśli któryś nie przejdzie, strona się nie zmienia. Dane w testach są wymyślone.
+- **Reguły dostępu do bazy** są tylko w repo Logistyka (`firestore.rules`, blok „Zapytania ofertowe”), razem z testami (`tests/rules.test.mjs`). Publikuje je tamtejszy automat „Wydanie”. Test ekranowy tutaj używa uproszczonych reguł (`tests/e2e/firestore.rules`).
 - Podgląd lokalnie: `python3 -m http.server` w katalogu repo; `index.html?emu` łączy z emulatorem Firebase (auth 9099, firestore 8085).
 - Wersje plików (`?v=…` w importach) ustawia automat publikacji – nie trzeba ich zmieniać ręcznie.
 - Repo jest publiczne: żadnych plików Excel, eksportów ani kopii z danymi firmy (blokuje je `.gitignore`).
