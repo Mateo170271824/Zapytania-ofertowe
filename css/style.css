@@ -239,3 +239,14 @@ rect.sp-p2{--d:1s}rect.sp-p4{--d:1.05s}rect.sp-p9{--d:1.4s}
 .motyw[aria-pressed="true"]{border-color:var(--accent)}
 .motyw .prev{display:grid;grid-template-columns:2fr 1fr 1fr;gap:3px;border-radius:6px;overflow:hidden}
 .motyw .prev span{height:16px}
+/* telefon: wąska kolumna A z zawijaniem, mniejsze komórki i przyciski – ceny widoczne obok pozycji */
+@media (max-width:700px){
+  table.ark td.a{min-width:0}
+  table.ark td.c{min-width:96px}
+  table.ark input,table.ark textarea{font-size:13px;padding:5px 6px}
+  table.ark textarea{white-space:pre-wrap;word-break:break-word}
+  table.ark .rn{width:26px;min-width:26px}
+  table.ark td.a,table.ark thead th:nth-child(2){left:26px}
+  #widok .panel>.hd .btn{padding:5px 9px;font-size:12.5px}
+  .arkuszbox{max-height:calc(100vh - 120px)}
+}
