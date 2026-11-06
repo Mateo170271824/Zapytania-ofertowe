@@ -1,6 +1,6 @@
-import * as L from "./logika.js?v=202611061353";
-import * as I from "./import-excel.js?v=202611061353";
-import * as CE from "./ceny.js?v=202611061353";
+import * as L from "./logika.js?v=202611061357";
+import * as I from "./import-excel.js?v=202611061357";
+import * as CE from "./ceny.js?v=202611061357";
 
 /* ============================================================ konfiguracja */
 const firebaseConfig = {
@@ -271,7 +271,7 @@ function renderGenerator() {
   const W8 = G.wiersze;
   const suma = W8.reduce((s, p) => s + (typeof L.wartoscZakupu(p) === "number" ? L.wartoscZakupu(p) : 0), 0);
   M().innerHTML = `
-  <div class="panel"><div class="hd"><h2>Generator zapytań ofertowych – braki magazynowe z Subiekta nexo</h2>
+  <div class="panel"><div class="hd"><h2>Generator zapytań ofertowych</h2>
     <div class="toolbar">
       <label class="btn primary filebtn"><span class="nr">1</span>Wczytaj eksport<input type="file" id="gFile" accept=".xlsx,.xls,.xlsm,.csv"></label>
       <button class="btn" id="gMag">Zapytanie na magazyn</button>
@@ -946,7 +946,7 @@ async function renderKoszt() {
     <div class="tablebox"><table class="t" style="min-width:1300px"><thead><tr><th>PROJEKT</th><th>KOD KLIENTA</th><th>DATA</th><th>SYMBOL</th><th>NAZWA</th><th>J.M.</th><th class="num">ILOŚĆ W DOK.</th><th class="num">NIEZAREZ.</th><th class="num">NA ZD</th><th class="num">CENA ZAKUPU</th><th>ZAPYTANO</th><th>ARKUSZ ZAPYTANIA</th><th>TREŚĆ W ZAPYTANIU</th></tr></thead><tbody>
     ${p.pozycje.map(x => `<tr><td>${esc(p.id)}</td><td>${esc(p.kod)}</td><td>${fD(p.data)}</td><td class="mono">${esc(x.symbol)}</td><td>${esc(x.nazwa)}</td><td>${esc(x.jm)}</td><td class="num">${L.ogolny(x.ilosc)}</td><td class="num">${L.ogolny(x.niez)}</td><td class="num">${L.ogolny(x.nazd)}</td><td class="num">${x.cz !== undefined ? L.ogolny(x.cz) : ""}</td><td>${esc(x.zapytano)}</td><td>${esc(x.ark)}</td><td>${esc(x.tresc)}</td></tr>`).join("")}</tbody></table></div></details>`;
   $("kPdf").onclick = async () => {
-    try { const pdf = await import("./pdf.js?v=202611061353"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
+    try { const pdf = await import("./pdf.js?v=202611061357"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
     catch (x) { console.error(x); toast("Nie udało się zrobić PDF: " + (x.message || x)); }
   };
 }
