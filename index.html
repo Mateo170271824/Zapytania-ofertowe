@@ -10,9 +10,32 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css?v=202611061415">
+<link rel="stylesheet" href="css/style.css?v=202611061440">
 </head>
 <body>
+<div id="splash" aria-hidden="true">
+  <svg viewBox="0 0 200 150" class="sp-ark">
+    <rect class="sp-sheet" x="18" y="12" width="164" height="126" rx="9"/>
+    <rect class="sp-head" x="18" y="12" width="164" height="24" rx="9"/><rect class="sp-head" x="18" y="26" width="164" height="10"/>
+    <rect class="sp-cel sp-d1" x="76" y="18" width="30" height="12" rx="3" fill="#00B0F0"/>
+    <rect class="sp-cel sp-d2" x="111" y="18" width="30" height="12" rx="3" fill="#FFD400"/>
+    <rect class="sp-cel sp-d3" x="146" y="18" width="30" height="12" rx="3" fill="#92D050"/>
+    <g class="sp-rows">
+      <rect class="sp-poz" x="26" y="46" width="42" height="8" rx="2"/><rect class="sp-poz" x="26" y="74" width="36" height="8" rx="2"/><rect class="sp-poz" x="26" y="102" width="44" height="8" rx="2"/>
+      <line x1="18" y1="64" x2="182" y2="64" class="sp-lin"/><line x1="18" y1="92" x2="182" y2="92" class="sp-lin"/><line x1="72" y1="36" x2="72" y2="138" class="sp-lin"/>
+    </g>
+    <g class="sp-ceny">
+      <rect class="sp-c sp-p1" x="78" y="44" width="26" height="12" rx="2"/><rect class="sp-c sp-p2 sp-win" x="113" y="44" width="26" height="12" rx="2"/><rect class="sp-c sp-p3" x="148" y="44" width="26" height="12" rx="2"/>
+      <rect class="sp-c sp-p4 sp-win" x="78" y="72" width="26" height="12" rx="2"/><rect class="sp-c sp-p5" x="113" y="72" width="26" height="12" rx="2"/><rect class="sp-c sp-p6" x="148" y="72" width="26" height="12" rx="2"/>
+      <rect class="sp-c sp-p7" x="78" y="100" width="26" height="12" rx="2"/><rect class="sp-c sp-p8" x="113" y="100" width="26" height="12" rx="2"/><rect class="sp-c sp-p9 sp-win" x="148" y="100" width="26" height="12" rx="2"/>
+      <text x="91" y="53.5" class="sp-zl sp-p1">4,05</text><text x="126" y="53.5" class="sp-zl sp-p2">3,69</text><text x="161" y="53.5" class="sp-zl sp-p3">3,87</text>
+      <text x="91" y="81.5" class="sp-zl sp-p4">55,00</text><text x="126" y="81.5" class="sp-zl sp-p5">58,90</text><text x="161" y="81.5" class="sp-zl sp-p6">56,55</text>
+      <text x="91" y="109.5" class="sp-zl sp-p7">3,42</text><text x="126" y="109.5" class="sp-zl sp-p8">3,51</text><text x="161" y="109.5" class="sp-zl sp-p9">3,38</text>
+    </g>
+    <g class="sp-ok"><path d="M135 57 l4 4 l8 -9" class="sp-tick sp-t1"/><path d="M100 85 l4 4 l8 -9" class="sp-tick sp-t2"/><path d="M170 113 l4 4 l8 -9" class="sp-tick sp-t3"/></g>
+  </svg>
+  <div class="sp-t"><small>Skavska</small>Zapytania ofertowe</div>
+</div>
 <div id="v-msg" class="login"><div class="empty"><strong id="msgT">Wczytywanie…</strong><span id="msgS"></span></div></div>
 
 <div id="v-login" class="login" hidden>
@@ -47,6 +70,7 @@
 <div id="cellbar" class="cellbar" hidden></div>
 
 <script src="vendor/xlsx.full.min.js"></script>
-<script type="module" src="js/app.js?v=202611061415"></script>
+<script>(function(){var s=document.getElementById("splash");function off(){if(s&&s.parentNode){s.classList.add("sp-off");setTimeout(function(){s.remove()},400)}}s.addEventListener("click",off);setTimeout(off,matchMedia("(prefers-reduced-motion: reduce)").matches?300:2700);})();</script>
+<script type="module" src="js/app.js?v=202611061440"></script>
 </body>
 </html>

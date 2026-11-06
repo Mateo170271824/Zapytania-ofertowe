@@ -1,6 +1,6 @@
-import * as L from "./logika.js?v=202611061415";
-import * as I from "./import-excel.js?v=202611061415";
-import * as CE from "./ceny.js?v=202611061415";
+import * as L from "./logika.js?v=202611061440";
+import * as I from "./import-excel.js?v=202611061440";
+import * as CE from "./ceny.js?v=202611061440";
 
 /* ============================================================ konfiguracja */
 const firebaseConfig = {
@@ -275,7 +275,7 @@ function renderGenerator() {
   <div class="panel"><div class="hd"><h2>Generator zapytań ofertowych</h2>
     <div class="toolbar">
       <label class="btn primary filebtn"><span class="nr">1</span>Wczytaj eksport<input type="file" id="gFile" accept=".xlsx,.xls,.xlsm,.csv"></label>
-      <button class="btn" id="gMag">Zapytanie na magazyn</button>
+      <button class="btn" id="gMag">Nowe zapytanie (lista / własne pozycje)</button>
       <button class="btn primary" id="gUtworz"><span class="nr">2</span>Utwórz zapytanie</button>
       <button class="btn" id="gMail"><span class="nr">3</span>Mail do dostawców</button>
       <button class="btn" id="gWyczysc"><span class="nr">4</span>Wyczyść listę</button>
@@ -393,7 +393,8 @@ async function wybierzZListy() {
   startCeny();
   if (!(await czekajNa(() => cenyZal, 8000))) return toast("Nie udało się wczytać listy materiałów"), null;
   const lista = CEN.filter(d => d.status !== "pomin" && d.nazwa).sort((a, b) => a.nazwa.localeCompare(b.nazwa, "pl", { numeric: true }));
-  if (!lista.length) { await okno(`<h3>Lista materiałów jest pusta</h3><p>Najpierw wgraj listę z Subiekta w zakładce „Ceny”.</p>`); return null; }
+  const JEDN = ["szt", "kg", "mb", "kpl", "m²", "t", "paczka"];
+  const wlasne = [];               // pozycje wpisane ręcznie: {nazwa, ilosc, jm}
   const wyb = new Map();          // id -> {ilosc, jm}
   const jmDom = d => { const t = L.typWyrobu(L.UC(d.nazwa)); return ["PRET", "PRETKW", "PRET6K"].includes(t) ? "kg" : ["szt", "kg", "mb"].includes(d.jm) ? d.jm : "szt"; };
   let q = "";
@@ -403,17 +404,31 @@ async function wybierzZListy() {
     return pasuje.slice(0, 120).map(d => { const w = wyb.get(d._id), c = d.historia?.at(-1)?.c;
       return `<tr data-id="${esc(d._id)}"><td><input type="checkbox" ${w ? "checked" : ""} aria-label="wybierz"></td><td>${esc(d.nazwa)}<div class="small mono">${esc(d.symbol)}${c ? ` · ${fmt(c, 2)} zł/${esc(d.jm || "?")}` : ""}</div></td>
         <td style="width:90px"><input data-il inputmode="decimal" value="${esc(w ? L.ogolny(w.ilosc) : "")}" placeholder="ilość"></td>
-        <td style="width:96px"><select data-jm>${["szt", "kg", "mb", "paczka"].map(j => `<option ${(w ? w.jm : jmDom(d)) === j ? "selected" : ""}>${j}</option>`).join("")}</select></td></tr>`; }).join("")
+        <td style="width:96px"><select data-jm>${JEDN.map(j => `<option ${(w ? w.jm : jmDom(d)) === j ? "selected" : ""}>${j}</option>`).join("")}</select></td></tr>`; }).join("")
       + (pasuje.length > 120 ? `<tr><td colspan="4" class="small">… i ${pasuje.length - 120} więcej – zawęź wyszukiwanie</td></tr>` : "")
       + (pasuje.length ? "" : `<tr><td colspan="4" class="small">Nic nie pasuje</td></tr>`);
   };
-  const r = await okno(`<h3>Dodaj z listy materiałów</h3>
-    <input type="search" id="zlQ" placeholder="Szukaj: 100x100x3, IPE 300, pręt 16… (kilka słów naraz)" autofocus>
+  const r = await okno(`<h3>Pozycje do zapytania</h3>
+    <div class="panel"><div class="bd" style="display:grid;gap:8px"><b>Własna pozycja</b> <span class="small">– wpisz cokolwiek: wypałki, obejmy, śruby, usługę…</span>
+      <div class="toolbar"><input id="wlN" placeholder="np. Obejma rurowa 42,4 ocynk" style="flex:1 1 260px"><input id="wlI" inputmode="decimal" placeholder="ilość" style="width:90px">
+      <select id="wlJ">${JEDN.map(j => `<option>${j}</option>`).join("")}</select><button type="button" class="btn" id="wlDodaj">Dodaj</button></div>
+      <div id="wlLista" class="small"></div></div></div>
+    ${lista.length ? `<b>Z listy materiałów</b>` : `<p class="small">Lista materiałów z Subiekta jest pusta (zakładka „Ceny”) – możesz dodawać tylko własne pozycje.</p>`}
+    <input type="search" id="zlQ" placeholder="Szukaj: 100x100x3, IPE 300, pręt 16… (kilka słów naraz)" ${lista.length ? "" : "hidden"}>
     <div class="tablebox" style="max-height:52vh;overflow:auto"><table class="t ed"><tbody id="zlRows">${wiersze()}</tbody></table></div>
     <div class="small" id="zlIle">Zaznaczono: 0</div>`,
     [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Dodaj zaznaczone", cls: "primary" }],
     { szer: "min(860px, calc(100vw - 24px))", poOtwarciu: f => {
-      const ile = () => f.querySelector("#zlIle").textContent = `Zaznaczono: ${wyb.size}` + (wyb.size ? " – " + [...wyb.values()].slice(0, 4).map(w => w.nazwa).join(", ") + (wyb.size > 4 ? "…" : "") : "");
+      const ile = () => { const w = [...wlasne, ...wyb.values()]; f.querySelector("#zlIle").textContent = `Zaznaczono: ${w.length}` + (w.length ? " – " + w.slice(0, 4).map(x => x.nazwa).join(", ") + (w.length > 4 ? "…" : "") : ""); };
+      const rysujWl = () => { f.querySelector("#wlLista").innerHTML = wlasne.map((x, i) => `<div>• ${esc(L.trescPozycji({ nazwa: x.nazwa, ilZap: x.ilosc, jm: x.jm }))} <button type="button" class="btn sm" data-wdel="${i}">✕</button></div>`).join(""); ile(); };
+      const dodajWl = () => { const n = f.querySelector("#wlN").value.trim(); if (!n) return f.querySelector("#wlN").focus(); const v = f.querySelector("#wlI").value.trim(), j = f.querySelector("#wlJ").value, num = L.naLiczbe(v);
+        wlasne.push({ symbol: "", nazwa: n, jm: j === "paczka" ? "szt" : j, ilosc: j === "paczka" ? (num.ok && num.w > 1 ? `${L.ogolny(num.w)} paczki` : "paczka") : (num.ok ? num.w : ""), wlasna: true });
+        f.querySelector("#wlN").value = ""; f.querySelector("#wlI").value = ""; f.querySelector("#wlN").focus(); rysujWl(); };
+      f.querySelector("#wlDodaj").onclick = dodajWl;
+      f.querySelector("#wlN").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); f.querySelector("#wlI").focus(); } };
+      f.querySelector("#wlI").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); dodajWl(); } };
+      f.querySelector("#wlLista").onclick = e => { const b = e.target.closest("[data-wdel]"); if (b) { wlasne.splice(+b.dataset.wdel, 1); rysujWl(); } };
+      setTimeout(() => f.querySelector(lista.length ? "#zlQ" : "#wlN").focus(), 50);
       const odczyt = tr => { const d = lista.find(x => x._id === tr.dataset.id), on = tr.querySelector('input[type="checkbox"]').checked, v = tr.querySelector("[data-il]").value.trim(), jm = tr.querySelector("[data-jm]").value;
         if (!on) { wyb.delete(d._id); return; }
         const n = L.naLiczbe(v); wyb.set(d._id, { symbol: d.symbol, nazwa: d.nazwa, jm: jm === "paczka" ? (jmDom(d)) : jm, ilosc: jm === "paczka" ? (n.ok && n.w > 1 ? `${L.ogolny(n.w)} paczki` : "paczka") : (n.ok ? n.w : ""), cz: d.historia?.at(-1)?.c, jmCeny: d.jm }); };
@@ -421,17 +436,21 @@ async function wybierzZListy() {
       f.querySelector("#zlRows").addEventListener("input", e => { const tr = e.target.closest("tr[data-id]"); if (!tr) return; if (e.target.matches("[data-il]") && e.target.value.trim()) tr.querySelector('input[type="checkbox"]').checked = true; odczyt(tr); ile(); });
       f.querySelector("#zlRows").addEventListener("change", e => { const tr = e.target.closest("tr[data-id]"); if (tr) { odczyt(tr); ile(); } });
     } });
-  if (r.v !== "ok" || !wyb.size) return null;
-  const bez = [...wyb.values()].filter(w => w.ilosc === "").length;
-  if (bez && !(await pytanie("Brak ilości", `Pozycji bez ilości: <b>${bez}</b>. Dodać mimo to? (w generatorze będą zaznaczone na żółto)`, "Dodaj"))) return null;
-  return [...wyb.values()];
+  // wpisana, ale niedodana własna pozycja – też ją bierzemy
+  const nN = r.form.querySelector("#wlN")?.value.trim();
+  if (r.v === "ok" && nN) { const v = r.form.querySelector("#wlI").value.trim(), j = r.form.querySelector("#wlJ").value, num = L.naLiczbe(v); wlasne.push({ symbol: "", nazwa: nN, jm: j === "paczka" ? "szt" : j, ilosc: j === "paczka" ? "paczka" : (num.ok ? num.w : ""), wlasna: true }); }
+  const wynik = [...wlasne, ...wyb.values()];
+  if (r.v !== "ok" || !wynik.length) return null;
+  const bez = wynik.filter(w => w.ilosc === "").length;
+  if (bez && !(await pytanie("Brak ilości", `Pozycji bez ilości: <b>${bez}</b>. Dodać mimo to?`, "Dodaj"))) return null;
+  return wynik;
 }
 // zapytanie na magazyn: pozycje z listy materiałów, bez generatora i bez danych projektu
 async function zapytanieNaMagazyn() {
   const wyb = await wybierzZListy(); if (!wyb) return;
   const rok = L.rokNumeru(U), nr = L.nastepnyNumer(Z.map(z => z.nazwa), rok);
-  const r = await okno(`<h3>Zapytanie na magazyn</h3><div class="grid2"><label>Numer<input name="n" value="${nr}-${rok}" required></label><label>Kod (komórka A1)<input name="k" value="MAG"></label></div>
-    <p class="small">${wyb.length} poz.: ${esc(wyb.slice(0, 5).map(x => x.nazwa).join(", "))}${wyb.length > 5 ? "…" : ""}</p><p class="small">Zapytanie nie tworzy danych projektu – koszt projektu go nie dotyczy.</p>`,
+  const r = await okno(`<h3>Nowe zapytanie</h3><div class="grid2"><label>Numer<input name="n" value="${nr}-${rok}" required></label><label>Kod (komórka A1)<input name="k" value="MAG"></label></div>
+    <p class="small">${wyb.length} poz.: ${esc(wyb.slice(0, 5).map(x => x.nazwa).join(", "))}${wyb.length > 5 ? "…" : ""}</p><p class="small">Np. na magazyn albo na drobne zakupy. Zapytanie nie tworzy danych projektu – koszt projektu go nie dotyczy.</p>`,
     [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Utwórz zapytanie", cls: "primary" }]);
   if (r.v !== "ok") return;
   let nazwa = r.form.n.value.trim() || `${nr}-${rok}`;
@@ -474,7 +493,7 @@ function renderLista() {
   const q = L.LC(listaQ);
   const lista = zapytaniaPosort().filter(z => !q || L.LC(z.nazwa + " " + z.kod + " " + z.wiersze.map(w => w.a).join(" ") + " " + Object.values(z.naglowki || {}).map(h => h.t).join(" ")).includes(q));
   M().innerHTML = `<div class="panel"><div class="hd"><div class="toolbar"><input id="lQ" type="search" placeholder="Przejdź do zapytania: numer, kod klienta, pozycja, dostawca…" style="width:340px" value="${esc(listaQ)}"></div>
-    <div class="toolbar"><button class="btn primary" id="lMag">Zapytanie na magazyn</button><button class="btn" id="lNowe">+ Puste zapytanie (z wzoru)</button></div></div>
+    <div class="toolbar"><button class="btn primary" id="lMag">Nowe zapytanie (lista / własne pozycje)</button><button class="btn" id="lNowe">+ Puste zapytanie (z wzoru)</button></div></div>
     <div class="lista">${lista.slice(0, 300).map(z => {
       const poz = z.wiersze.filter(w => L.vbaTrim(w.a)).length, dost = Object.values(z.naglowki || {}).filter(h => h.t).length, wyb = Object.values(z.naglowki || {}).filter(h => L.kolor(h.k) !== -1).length;
       const proj = L.projektDlaZapytania(P, z.nazwa);
@@ -948,7 +967,7 @@ async function renderKoszt() {
     <div class="tablebox"><table class="t" style="min-width:1300px"><thead><tr><th>PROJEKT</th><th>KOD KLIENTA</th><th>DATA</th><th>SYMBOL</th><th>NAZWA</th><th>J.M.</th><th class="num">ILOŚĆ W DOK.</th><th class="num">NIEZAREZ.</th><th class="num">NA ZD</th><th class="num">CENA ZAKUPU</th><th>ZAPYTANO</th><th>ARKUSZ ZAPYTANIA</th><th>TREŚĆ W ZAPYTANIU</th></tr></thead><tbody>
     ${p.pozycje.map(x => `<tr><td>${esc(p.id)}</td><td>${esc(p.kod)}</td><td>${fD(p.data)}</td><td class="mono">${esc(x.symbol)}</td><td>${esc(x.nazwa)}</td><td>${esc(x.jm)}</td><td class="num">${L.ogolny(x.ilosc)}</td><td class="num">${L.ogolny(x.niez)}</td><td class="num">${L.ogolny(x.nazd)}</td><td class="num">${x.cz !== undefined ? L.ogolny(x.cz) : ""}</td><td>${esc(x.zapytano)}</td><td>${esc(x.ark)}</td><td>${esc(x.tresc)}</td></tr>`).join("")}</tbody></table></div></details>`;
   $("kPdf").onclick = async () => {
-    try { const pdf = await import("./pdf.js?v=202611061415"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
+    try { const pdf = await import("./pdf.js?v=202611061440"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
     catch (x) { console.error(x); toast("Nie udało się zrobić PDF: " + (x.message || x)); }
   };
 }
