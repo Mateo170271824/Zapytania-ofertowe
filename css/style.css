@@ -191,3 +191,9 @@ table.ark input,table.ark textarea{font-size:14px;padding:6px 9px}
 table.t td{padding:7px 11px}
 table.t td.strong:first-child,#cRows td:first-child{min-width:240px}
 table.gen td:nth-child(3),table.gen td:nth-child(14){min-width:280px}
+/* pasek opcji komórki – na stałe nad arkuszem (nie zasłania komórek) */
+.pasek{display:flex;align-items:center;gap:8px;min-height:44px;padding-top:6px;padding-bottom:6px;border-top:1px solid var(--line)}
+.pasek .cellbar{position:static;display:flex;align-items:center;gap:8px;background:none;color:var(--fg);padding:0;box-shadow:none;max-width:none;flex-wrap:wrap}
+.pasek .cellbar[hidden]{display:none!important}
+.pasek .cellbar .btn{border-color:var(--line)}
+.pasek .cellbar .btn.primary{border-color:var(--accent)}

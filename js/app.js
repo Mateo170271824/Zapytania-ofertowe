@@ -1,6 +1,6 @@
-import * as L from "./logika.js?v=202611061357";
-import * as I from "./import-excel.js?v=202611061357";
-import * as CE from "./ceny.js?v=202611061357";
+import * as L from "./logika.js?v=202611061415";
+import * as I from "./import-excel.js?v=202611061415";
+import * as CE from "./ceny.js?v=202611061415";
 
 /* ============================================================ konfiguracja */
 const firebaseConfig = {
@@ -257,6 +257,7 @@ function zakladka() {
 function render() {
   if (!me) return;
   zakladka();
+  document.body.append($("cellbar"));     // pasek opcji komórki wraca na miejsce przed przerysowaniem widoku
   $("cellbar").hidden = true;
   const v = widok.nazwa;
   if (v === "dostep" && !isOwner) return go("generator");
@@ -527,6 +528,7 @@ function renderArkusz() {
         ${isOwner ? `<button class="btn danger" id="aUsun">Usuń</button>` : ""}
       </div></div>
       <div class="bd legend" id="aLegenda"></div>
+      <div class="bd pasek" id="aPasek"><span class="small" id="aPasekInfo">Kliknij komórkę – tu pojawią się opcje (wybór dostawcy, komentarz, wiersze, kolumny).</span></div>
       <div class="bd notice" id="aWyborInfo" hidden>Tryb wyboru: kliknij cenę dostawcy w wierszu pozycji – pozycja i nagłówek dostawcy dostaną ten sam kolor (jak zaznaczanie kolorem w Excelu). Kliknięcie pozycji w kolumnie A usuwa wybór, kliknięcie nagłówka dostawcy zmienia jego kolor. Bez tego trybu: kliknij cenę i użyj „Wybierz tego dostawcę”.</div>
     </div>
     <div id="aBox"><div class="arkuszbox" id="aGrid"></div></div>
@@ -545,6 +547,7 @@ function renderArkusz() {
   };
   $("aUsun") && ($("aUsun").onclick = usunZapytanie);
   $("aZmienNazwe") && ($("aZmienNazwe").onclick = zmienNazwe);
+  $("aPasek").append($("cellbar"));
   rysujArkusz(); rysujHistorie();
 }
 function rysujHistorie() {
@@ -673,7 +676,7 @@ document.addEventListener("focusout", e => {
   ustawKomorke(r, c, el.value);
   if (JSON.stringify(E) !== przed) { zmiana(); if (r >= 2) { const pos = { r, c }; setTimeout(() => { if (!document.activeElement?.closest?.("table.ark")) rysujArkusz(); else odswiezWiersz(pos.r); }, 0); } }
   else if (r >= 2 && c >= 2) el.value = wartWyswietl(E.wiersze[r - 2]?.c?.[c], c);
-  setTimeout(() => { if (!document.activeElement?.closest?.("table.ark, #cellbar")) $("cellbar").hidden = true; }, 150);
+  setTimeout(() => { if (!document.activeElement?.closest?.("table.ark, #cellbar")) { $("cellbar").hidden = true; if ($("aPasekInfo")) $("aPasekInfo").hidden = false; } }, 150);
 });
 document.addEventListener("input", e => { if (e.target.matches?.("table.ark textarea")) autoH(e.target); });
 document.addEventListener("keydown", e => {
@@ -752,11 +755,10 @@ function pokazPasek(el, r, c) {
   if (r >= 2 && c === 1) btn.push(`<button class="btn sm" data-a="wstawW">Wstaw wiersz nad</button>`, `<button class="btn sm" data-a="usunW">Usuń wiersz</button>`);
   if (r === 1 && c >= 2) btn.push(`<button class="btn sm" data-a="wstawK">Wstaw kolumnę przed</button>`, `<button class="btn sm" data-a="usunK">Usuń kolumnę</button>`);
   if (r >= 2 && c >= 2 && L.kolor(E.wiersze[r - 2]?.c?.[c]?.k) !== -1) btn.push(`<button class="btn sm" data-a="bezKol">Usuń kolor komórki</button>`);
-  bar.innerHTML = btn.join("");
+  const opis = r === 1 ? (c === 1 ? "kod klienta" : "dostawca") : c === 1 ? L.vbaTrim(E.wiersze[r - 2]?.a || "").slice(0, 50) : [E.naglowki?.[c]?.t, L.vbaTrim(E.wiersze[r - 2]?.a || "").slice(0, 40)].filter(Boolean).join(" · ");
+  bar.innerHTML = `<span class="mono strong">${kolLit(c)}${r}</span><span class="small">${esc(opis)}</span>` + btn.join("");
   bar.hidden = false;
-  const top = rc.top - bar.offsetHeight - 6;
-  bar.style.top = (top < 8 ? rc.bottom + 6 : top) + "px";
-  bar.style.left = Math.max(8, Math.min(rc.left, innerWidth - bar.offsetWidth - 8)) + "px";
+  if ($("aPasekInfo")) $("aPasekInfo").hidden = true;
   bar.dataset.r = r; bar.dataset.c = c;
 }
 $("cellbar").addEventListener("mousedown", e => e.preventDefault());
@@ -946,7 +948,7 @@ async function renderKoszt() {
     <div class="tablebox"><table class="t" style="min-width:1300px"><thead><tr><th>PROJEKT</th><th>KOD KLIENTA</th><th>DATA</th><th>SYMBOL</th><th>NAZWA</th><th>J.M.</th><th class="num">ILOŚĆ W DOK.</th><th class="num">NIEZAREZ.</th><th class="num">NA ZD</th><th class="num">CENA ZAKUPU</th><th>ZAPYTANO</th><th>ARKUSZ ZAPYTANIA</th><th>TREŚĆ W ZAPYTANIU</th></tr></thead><tbody>
     ${p.pozycje.map(x => `<tr><td>${esc(p.id)}</td><td>${esc(p.kod)}</td><td>${fD(p.data)}</td><td class="mono">${esc(x.symbol)}</td><td>${esc(x.nazwa)}</td><td>${esc(x.jm)}</td><td class="num">${L.ogolny(x.ilosc)}</td><td class="num">${L.ogolny(x.niez)}</td><td class="num">${L.ogolny(x.nazd)}</td><td class="num">${x.cz !== undefined ? L.ogolny(x.cz) : ""}</td><td>${esc(x.zapytano)}</td><td>${esc(x.ark)}</td><td>${esc(x.tresc)}</td></tr>`).join("")}</tbody></table></div></details>`;
   $("kPdf").onclick = async () => {
-    try { const pdf = await import("./pdf.js?v=202611061357"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
+    try { const pdf = await import("./pdf.js?v=202611061415"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
     catch (x) { console.error(x); toast("Nie udało się zrobić PDF: " + (x.message || x)); }
   };
 }

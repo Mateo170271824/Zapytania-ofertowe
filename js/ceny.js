@@ -1,7 +1,7 @@
 /* Baza cen: lista z Subiekta (cena ewidencyjna), ceny zakupu z eksportów (projekty)
    i ceny dostawców wybranych w zapytaniach (tylko kupione – zaznaczone kolorem).
    Każda cena przeliczana na zł/kg, zł/mb i zł/szt (wagi i długości jak w makrach). */
-import * as L from "./logika.js?v=202611061357";
+import * as L from "./logika.js?v=202611061415";
 
 export const WYKLUCZ_NAZWA = /WYPA[ŁL]K|W[ÓO]ZE?K/;          // wypałki, wózki podwieszane
 export const WYKLUCZ_RODZAJ = ["KT"];                          // kolumna B listy (KT – kooperacja)
