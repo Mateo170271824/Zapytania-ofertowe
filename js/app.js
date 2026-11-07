@@ -641,18 +641,29 @@ document.addEventListener("click", async e => {
   if (a === "cofnij") { if (!(await pytanie("Wyczyścić zamówienie?", `${esc(z.dostawca)}${z.kursId ? "<br>Dostawa w Logistyce zostaje – usuń ją tam, jeśli trzeba." : ""}`, "Wyczyść"))) return; delete E.zamowienia[k]; zmiana(); rysujZamowienia(); return; }
   if (a === "kurs") {
     const wT = g.wagaKg != null ? L.vbaRound(g.wagaKg / 1000, 3) : "";
+    // adres dostawcy i oddziały z Truck App (ta sama baza; konto biura może je czytać)
+    const [ustT, pubT] = await Promise.all([B.get("ustawienia", "glowne").catch(() => null), B.get("ustawienia", "publiczne").catch(() => null)]);
+    const listaT = ustT?.dostawcy || [], dT = ZM.dostawcaTruck(z.dostawca, listaT);
+    const oddz = pubT?.oddzialy?.length ? pubT.oddzialy : ZM.ODDZIALY_DOM;
+    let oddzOst = ""; try { oddzOst = localStorage.getItem("zap_oddzial") || ""; } catch {}
+    if (!oddz.some(o => o.nazwa === oddzOst)) oddzOst = oddz[0].nazwa;
     const r = await okno(`<h3>Dostawa w Logistyce: ${esc(z.dostawca)}</h3>
       <p class="small">Powstanie dostawa oznaczona „🛒 do uzupełnienia” – biuro w Logistyce uzupełni transport i awizo, jak przy dostawach z Kooperacji.</p>
       <div class="grid3"><label>Dostawca<input name="kontr" value="${esc(z.dostawca)}" required></label><label>Nr (zamówienia)<input name="nr" value="${esc(z.nr || E.nazwa)}" required></label><label>Projekt / kod<input name="proj" value="${esc(E.kod || "")}"></label>
       <label>Transport<select name="tr"><option value="Dostawca">transport dostawcy</option><option value="Spedycja">spedycja</option><option value="Skavska">nasz transport</option></select></label>
       <label>Załadunek (data)<input name="zal" type="date" value="${esc(z.dostawa || "")}"></label><label>Waga [t]<input name="waga" inputmode="decimal" value="${wT === "" ? "" : L.ogolny(wT)}"></label>
+      <label class="full">Adres załadunku (u dostawcy)<input name="miejsce" value="${esc(dT?.adres || "")}" placeholder="ulica, kod, miasto" list="zapAdresy" autocomplete="off"><datalist id="zapAdresy">${listaT.filter(x => x.adres).map(x => `<option value="${esc(x.adres)}">${esc(x.nazwa)}</option>`).join("")}</datalist></label>
+      <label>Dostawa do oddziału<select name="oddzial">${oddz.map(o => `<option ${o.nazwa === oddzOst ? "selected" : ""}>${esc(o.nazwa)}</option>`).join("")}</select></label>
+      <div class="small full" style="align-self:end">${dT?.adres ? `Adres z listy dostawców Truck App (${esc(dT.nazwa)}).` : "Tego dostawcy nie ma z adresem na liście Truck App – wpisz adres albo zostaw puste (uzupełni biuro)."}</div>
       <label class="full">Uwagi<input name="uwagi" value="${esc(`Zapytanie ${E.nazwa}${z.uwagi ? " · " + z.uwagi : ""}`)}"></label></div>
       <div class="small">Pozycje (${g.pozycje.length}): ${esc(g.pozycje.map(p => p.w.a).join(" · "))}</div>`, [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Utwórz dostawę", cls: "primary" }]);
     if (r.v !== "ok") return;
     await zapiszTeraz();
     const f = r.form, wg = L.naLiczbe(f.waga.value);
     const { kurs, koszt } = ZM.kursLogistyki({ nr: f.nr.value.trim(), proj: f.proj.value.trim(), kontr: f.kontr.value.trim(), transport: f.tr.value, zal: f.zal.value, dst: "", wagaT: wg.ok ? wg.w : null,
-      pozycje: g.pozycje.map(p => ZM.pozycjaDoKursu(p.w.a)), uwagi: f.uwagi.value.trim(), kto: user.login || me.nazwa, nazwa: me.nazwa }, B.now());
+      pozycje: g.pozycje.map(p => ZM.pozycjaDoKursu(p.w.a)), uwagi: f.uwagi.value.trim(), kto: user.login || me.nazwa, nazwa: me.nazwa,
+      miejsce: f.miejsce.value.trim(), oddzial: f.oddzial.value, kontakt: dT?.tel || "" }, B.now());
+    try { localStorage.setItem("zap_oddzial", f.oddzial.value); } catch {}
     const kursId = B.newId("kursy"), logId = B.newId(C.log);
     try {
       await B.tx(async t => {

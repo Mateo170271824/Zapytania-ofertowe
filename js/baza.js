@@ -33,6 +33,7 @@ export async function firebase() {
     accounts: async () => (await F.getDocs(F.query(F.collection(db, "uzytkownicy"), F.where("rola", "==", "biuro")))).docs.map(d => ({ uid: d.id, ...d.data() })),
     tx: fn => F.runTransaction(db, T => fn(wrapT(T))),
     batch: async ops => { const b = F.writeBatch(db); for (const o of ops) { const r = F.doc(db, o.c, o.id); if (o.del) b.delete(r); else if (o.upd) b.update(r, o.d); else b.set(r, o.d); } await b.commit(); },
+    get: async (c, id) => { const s = await F.getDoc(F.doc(db, c, id)); return s.exists() ? s.data() : null; },
     newId: c => F.doc(F.collection(db, c)).id,
     now: () => F.serverTimestamp(),
   };
