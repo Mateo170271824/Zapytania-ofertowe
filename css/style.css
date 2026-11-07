@@ -285,3 +285,18 @@ table.ark2 td.c.kol:not(.dost) input{background:color-mix(in srgb,var(--k) 30%,v
 table.ark2 td.c.wyb input{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--k) 75%,#000);font-weight:700}
 table.ark2 td.c.wyb::before{content:"✓";position:absolute;left:8px;top:50%;transform:translateY(-50%);font:700 12px sans-serif;color:color-mix(in srgb,var(--k) 55%,#000);pointer-events:none;z-index:1}
 table.ark2 td.plus{background:var(--sunk)}
+
+/* ===== Wspólne barwy systemu (karta kolorów „Wspólne barwy systemu – Logistyka i Zakupy”, Canva, 11.2026) =====
+   Wspólne dla wszystkich aplikacji: tło, tekst, linie, statusy, pomarańczowe przyciski akcji.
+   Kolor modułu (ta aplikacja): pasek nagłówka. Truck App #1F3864 · Kooperacje #1F5F7A · Zapytania #366092 · Kombajn #2F4A6D */
+:root:not([data-motyw]){ --sys-granat:#1f3864; --sys-akcja:#e08a3c; --sys-akcja-hover:#c9742a; --sys-akcja-fg:#ffffff; --modul:#366092; }
+@media (prefers-color-scheme: light){:root:not([data-motyw]){
+  --bg:#f2f3f1; --surface:#ffffff; --line:#d2d6cf; --fg:#1b2028; --muted:#5b6270; --ok:#2e7a3b; --warn:#946000; --bad:#b0332a; --th-bg:#1f3864; --th-line:#16294a; }}
+@media (prefers-color-scheme: dark){:root:not([data-motyw]):not([data-theme="light"]){ --bg:#12161b; --surface:#1a2028; --fg:#e3e8ee; }}
+:root[data-theme="dark"]{ --bg:#12161b; --surface:#1a2028; --fg:#e3e8ee; }
+header.top{background:var(--modul);color:#fff;padding:14px 18px;border-radius:12px}
+header.top h1{color:#fff}
+header.top .sub,header.top .who{color:rgba(255,255,255,.82)}
+header.top .who b{color:#fff}
+.btn.primary{background:var(--sys-akcja);border-color:var(--sys-akcja);color:var(--sys-akcja-fg)}
+.btn.primary:hover{background:var(--sys-akcja-hover);border-color:var(--sys-akcja-hover)}
