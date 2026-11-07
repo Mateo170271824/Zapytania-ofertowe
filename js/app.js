@@ -609,10 +609,11 @@ function rysujZamowienia() {
       const t = g.wagaKg != null ? L.vbaRound(g.wagaKg / 1000, 3) : null;
       return `<div class="sup-z" data-k="${g.kolor}" style="border-left:6px solid #${g.kolor}"><div class="toolbar" style="justify-content:space-between">
           <div><b>${esc(ZM.pelnaNazwa(g.dostawca, U))}</b> <span class="pill ${st[0]}">${st[1]}</span>
-            <div class="small">${g.pozycje.length} poz.${t != null ? ` · ok. ${fmt(t, 3)} t` : ""}${g.bezWagi ? ` (${g.bezWagi} bez wagi)` : ""}${z.nr ? ` · zam. <b>${esc(z.nr)}</b>` : ""}${z.data ? ` z ${fD(z.data)}` : ""}${z.dostawa ? ` · dostawa ${fD(z.dostawa)}` : ""}${kurs && !kurs.brakDostepu ? ` · Logistyka: ${esc(kurs.status || "")}${kurs.zal ? `, załadunek ${fD(kurs.zal)}` : ""}${kurs.dst ? `, dostawa ${fD(kurs.dst)}` : ""}` : ""}</div></div>
+            <div class="small">${g.pozycje.length} poz.${t != null ? ` · ok. ${fmt(t, 3)} t` : ""}${g.bezWagi ? ` (${g.bezWagi} bez wagi)` : ""}${z.nr ? ` · zam. <b>${esc(z.nr)}</b>` : ""}${z.zak ? ` · <span class="pill p-ok" title="Dopisane do Zakupów profili">w Zakupach profili: ${z.zak.n} poz.</span>` : ""}${z.data ? ` z ${fD(z.data)}` : ""}${z.dostawa ? ` · dostawa ${fD(z.dostawa)}` : ""}${kurs && !kurs.brakDostepu ? ` · Logistyka: ${esc(kurs.status || "")}${kurs.zal ? `, załadunek ${fD(kurs.zal)}` : ""}${kurs.dst ? `, dostawa ${fD(kurs.dst)}` : ""}` : ""}</div></div>
           <div class="toolbar">
             <button class="btn sm ${z.status ? "" : "primary"}" data-za="zam">${z.status ? "Popraw zamówienie" : "Zamówiono"}</button>
             ${z.status && !z.kursId ? `<button class="btn sm primary" data-za="kurs">Utwórz dostawę w Logistyce</button>` : ""}
+            ${z.status && !z.zak ? `<button class="btn sm" data-za="zak" title="Pozycje profili z tego zamówienia dopisane do zamówień w Zakupach profili (Kombajn Zakupowca)">Do Zakupów profili</button>` : ""}
             ${z.status && !dost && z.status !== "dostarczono" ? `<button class="btn sm" data-za="dost">Dostarczono</button>` : ""}
             ${z.status ? `<button class="btn sm ghost" data-za="cofnij" title="Wyczyść status zamówienia">✕</button>` : ""}
           </div></div>
@@ -639,6 +640,45 @@ document.addEventListener("click", async e => {
   }
   if (a === "dost") { z.status = "dostarczono"; E.zamowienia[k] = z; zmiana(); rysujZamowienia(); return; }
   if (a === "cofnij") { if (!(await pytanie("Wyczyścić zamówienie?", `${esc(z.dostawca)}${z.kursId ? "<br>Dostawa w Logistyce zostaje – usuń ją tam, jeśli trzeba." : ""}`, "Wyczyść"))) return; delete E.zamowienia[k]; zmiana(); rysujZamowienia(); return; }
+  if (a === "zak") {
+    // Zakupy profili (Kombajn Zakupowca): indeksy profili i dostawcy z zak_cfg/main; dostęp ma właściciel i zastępca Zakupów
+    let cfg = null; try { cfg = await B.get("zak_cfg", "main"); } catch (x) { cfg = null; }
+    if (!cfg || !(cfg.skus || []).length) { okno(`<h3>Brak dostępu do Zakupów profili</h3><p>Nie mogę odczytać listy indeksów profili z Kombajnu Zakupowca. Zamówienia dopisuje tam właściciel albo zastępca Zakupów.</p>`); return; }
+    const klucze = cfg.skus.map(s => s.key), dostZ = cfg.suppliers || [];
+    let wg = null; try { wg = L.wagaDlaDostawcow(E, { wagi: L.slownikWag(W), pamiec: W.pamiec || {}, pytaj: () => null }); } catch { wg = null; }
+    const wagaPoz = r => { const d = wg && !wg.blad ? wg.dostawcy.find(x => x.c === g.c) : null; const p = d ? d.pozycje.find(x => x.wiersz === r) : null; return p && p.waga > 0 ? p.waga : -1; };
+    const W2 = g.pozycje.map(({ w, r }) => { const pk = ZM.pozycjaDoKursu(w.a), kg = wagaPoz(r), cena = L.naLiczbe(w.c?.[g.c]?.v);
+      return { tekst: w.a, key: ZM.dopasujIndeks(w.a, klucze), t: kg > 0 ? L.vbaRound(kg / 1000, 3) : "", price: cena.ok ? ZM.cenaZaTone(cena.w, pk.jm, pk.ilosc, kg) : null }; });
+    const supDom = ZM.dostawcaZakupow(z.dostawca, dostZ);
+    const opcje = k => `<option value="">— nie dopisuj —</option>` + klucze.map(x => `<option ${x === k ? "selected" : ""}>${esc(x)}</option>`).join("");
+    const r = await okno(`<h3>Do Zakupów profili: ${esc(z.dostawca)}</h3>
+      <p class="small">Pozycje profili trafią do zamówień w Zakupach profili (Kombajn Zakupowca) – jak przy ręcznym dodaniu zamówienia. Indeks, tony i cenę możesz poprawić; pozycje bez indeksu się pomija.</p>
+      <div class="grid3"><label>Dostawca w Zakupach<select name="sup">${(supDom ? [] : [`<option value="">— wybierz —</option>`]).concat(dostZ.map(x => `<option ${x === supDom ? "selected" : ""}>${esc(x)}</option>`)).join("")}</select></label>
+      <label>Nr ZD<input name="zd" value="${esc(z.nr || "")}"></label><label>Nr zamówienia dostawcy<input name="nr" placeholder="opcjonalnie"></label>
+      <label>Data zamówienia<input name="date" type="date" value="${esc(z.data || today())}"></label><label>Termin dostawy<input name="term" type="date" value="${esc(z.dostawa || "")}"></label></div>
+      <div class="tw"><table class="t"><thead><tr><th>Pozycja z zapytania</th><th>Indeks w Zakupach</th><th>Tony</th><th>Cena zł/t</th></tr></thead><tbody>
+      ${W2.map((x, i) => `<tr><td class="small">${esc(x.tekst)}</td><td><select name="key${i}">${opcje(x.key)}</select></td><td><input name="t${i}" inputmode="decimal" value="${x.t === "" ? "" : L.ogolny(x.t)}" style="width:80px"></td><td><input name="c${i}" inputmode="decimal" value="${x.price == null ? "" : L.ogolny(x.price)}" style="width:90px"></td></tr>`).join("")}
+      </tbody></table></div>`, [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Dopisz do Zakupów", cls: "primary" }], { szer: "min(900px, 96vw)" });
+    if (r.v !== "ok") return;
+    const f = r.form, H = { sup: f.sup.value, zd: f.zd.value.trim(), nr: f.nr.value.trim(), date: f.date.value, term: f.term.value, note: `z zapytania ${E.nazwa}` };
+    if (!H.sup) { toast("Wybierz dostawcę z listy Zakupów profili"); return; }
+    const docs = ZM.zamowieniaZakupow(W2.map((x, i) => { const t = L.naLiczbe(f["t" + i].value), c = L.naLiczbe(f["c" + i].value); return { key: f["key" + i].value, t: t.ok ? t.w : 0, price: c.ok ? c.w : 0 }; }), H);
+    if (!docs.length) { toast("Żadna pozycja nie ma indeksu i ton – nic nie dopisano"); return; }
+    await zapiszTeraz();
+    const ids = docs.map(() => B.newId("zak_zam")), logId = B.newId(C.log);
+    try {
+      await B.tx(async t => {
+        const cur = await t.get(C.z, eId); if (!cur) throw new Error("zapytanie zniknęło");
+        const zam = { ...(cur.zamowienia || {}) }; zam[k] = { ...(zam[k] || z), zak: { ids, n: docs.length, czas: Date.now() } };
+        docs.forEach((d, i) => t.set("zak_zam", ids[i], d));
+        t.set(C.z, eId, czysc({ ...cur, zamowienia: zam, wersja: (cur.wersja || 0) + 1, ostatniWpis: logId, zmieniono: B.now(), zmienil: me.uid, zmienilNazwa: me.nazwa }));
+        t.set(C.log, logId, wpis("zapytanie", eId, E.nazwa, "zmiana", [{ p: `Zakupy profili (${z.dostawca})`, a: "", b: `${docs.length} poz. · ${L.ogolny(docs.reduce((a, d) => a + d.t, 0))} t` }]));
+      });
+      E.zamowienia = E.zamowienia || {}; E.zamowienia[k] = { ...z, zak: { ids, n: docs.length, czas: Date.now() } }; eWersja += 1;
+      toast(`Dopisano do Zakupów profili: ${docs.length} poz.`); rysujZamowienia();
+    } catch (x) { if (String(x?.code).includes("permission")) okno(`<h3>Brak uprawnień</h3><p>Zamówienia w Zakupach profili dopisuje właściciel albo zastępca Kombajnu Zakupowca.</p>`); else failed(x); }
+    return;
+  }
   if (a === "kurs") {
     const wT = g.wagaKg != null ? L.vbaRound(g.wagaKg / 1000, 3) : "";
     // adres dostawcy i oddziały z Truck App (ta sama baza; konto biura może je czytać)
