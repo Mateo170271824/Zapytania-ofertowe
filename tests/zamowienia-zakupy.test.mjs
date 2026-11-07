@@ -50,3 +50,8 @@ test("jedna lista dostawców: dopisanie do kartoteki Truck App bez nadpisywania"
   assert.equal(ZM.scalDostawcow(r.lista, [{ nazwa: "Stal-Pol" }], "zak").zmiany, 1);       // tylko nowa flaga (inna aplikacja)
   assert.equal(ZM.scalDostawcow(r.lista, [{ nazwa: "Huta Pokój", email: "x" }], "zap").zmiany, 0);
 });
+
+test("kod projektu do wspólnego słownika", () => {
+  assert.equal(ZM.kodProjektu("  halm "), "HALM");
+  assert.equal(ZM.kodProjektu("budc  2"), "BUDC 2");
+});

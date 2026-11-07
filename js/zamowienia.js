@@ -117,3 +117,6 @@ export function scalDostawcow(lista, wpisy, flaga) {
   if (zmiany) L.sort((a, b) => String(a.nazwa).localeCompare(String(b.nazwa), "pl"));
   return { lista: L, zmiany };
 }
+
+// kod projektu do wspólnego słownika (projekty): wielkie litery, pojedyncze spacje
+export const kodProjektu = s => String(s || "").trim().toUpperCase().replace(/\s+/g, " ");

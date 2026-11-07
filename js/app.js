@@ -74,6 +74,7 @@ function startData() {
   subs.push(B.watch(C.z, a => { Z = a; zaladowane.z = true; poZmianieDanych("z"); }, err));
   subs.push(B.watch(C.p, a => { P = a; zaladowane.p = true; poZmianieDanych("p"); }, err));
   subs.push(B.watch(C.log, a => { LOG = a; poZmianieDanych("log"); }, err));
+  subs.push(B.watch("projekty", L2 => { PROJ = L2; const dl = $("projDL"); if (dl) dl.innerHTML = projOpcje(); }, () => { PROJ = []; }));
   subs.push(B.watchDoc(C.u, "config", d => { U = { ...clone(L.USTAWIENIA_DOMYSLNE), ...(d || {}) }; zaladowane.u = true; poZmianieDanych("u"); }, err));
   subs.push(B.watchDoc(C.u, "wagi", d => { W = d ? { rows: d.rows || [], pamiec: d.pamiec || {} } : { rows: [], pamiec: {} }; zaladowane.w = true; poZmianieDanych("w"); }, err));
   subs.push(B.watchDoc(C.u, "generator", d => { if (genDirty) return; G = d ? { kod: "", plik: "", ostatnie: "", wiersze: [], ...d } : G; genStary = clone(G); zaladowane.g = true; poZmianieDanych("g"); }, err));
@@ -214,7 +215,7 @@ function renderGenerator() {
       <button class="btn" id="gWyczysc"><span class="nr">4</span>Wyczyść listę</button>
     </div></div>
     <div class="bd pola">
-      <div class="pole"><span class="lbl">Kod klienta</span><input id="gKod" value="${esc(G.kod)}"></div>
+      <div class="pole"><span class="lbl">Kod klienta</span><input id="gKod" value="${esc(G.kod)}" list="projDL" autocomplete="off"><datalist id="projDL">${projOpcje()}</datalist></div>
       <div class="pole"><span class="lbl">Plik eksportu</span><span class="val">${esc(G.plik) || "—"}</span></div>
       <div class="pole"><span class="lbl">Następny numer</span><span class="val mono">${esc(nast)}</span></div>
       <div class="pole"><span class="lbl">Ostatnio utworzone</span><span class="val">${esc(G.ostatnie) || "—"}</span></div>
@@ -310,6 +311,7 @@ async function utworzZapytanie() {
       t.set(C.log, logId, wpis("zapytanie", "", utworzone, "utworzenie", [{ p: "utworzono z generatora", a: "", b: `${utworzone} – ${u.ilePozycji} poz.${G.kod ? ", " + G.kod : ""}` }]));
     });
   } catch (x) { return failed(x); }
+  if (G.kod) dopiszProjekt(G.kod);
   const r = await okno(`<h3>Zapytanie gotowe</h3><p>Utworzono: <b>${esc(utworzone)}</b><br>Pozycji w zapytaniu: <b>${u.ilePozycji}</b></p><p>Przygotować maila do dostawców?<br><span class="small">(możesz to zrobić też później przyciskiem „3. Mail do dostawców”)</span></p>`,
     [{ v: "nie", t: "Nie", nv: true }, { v: "tak", t: "Tak", cls: "primary" }]);
   const pierwsze = () => zapByNazwa(u.zapytania[0].nazwa);
@@ -747,6 +749,15 @@ function ustawKomorke(r, c, tekst) {
   if (cel.v === undefined && !cel.f && L.kolor(cel.k) === -1 && !cel.m) delete w.c[c]; else w.c[c] = cel;
 }
 function zmiana() { eDirty = true; status(); clearTimeout(eTimer); eTimer = setTimeout(zapiszArkusz, 800); }
+// wspólny słownik projektów (kolekcja projekty – Truck App, Kooperacje, Zapytania, Kombajn): podpowiedzi i dopisywanie nowych kodów
+let PROJ = [];
+const projOpcje = () => PROJ.map(p => `<option value="${esc(p.kod)}">${esc([p.nazwa, p.klient].filter(Boolean).join(" · "))}</option>`).join("");
+function dopiszProjekt(kod) {
+  const k = ZM.kodProjektu(kod);
+  if (!k || k.length > 40 || k.includes("/") || PROJ.some(p => p.kod === k)) return;
+  PROJ.push({ kod: k });
+  B.batch([{ c: "projekty", id: k, d: { kod: k, zrodla: { zap: true }, utworzono: B.now(), utworzyl: user.login || me.nazwa || "" }, merge: true }]).catch(x => console.warn(x));
+}
 async function zapiszArkusz() {
   clearTimeout(eTimer);
   if (!eDirty || !E) return;
@@ -758,7 +769,7 @@ async function zapiszArkusz() {
     .then(r => {
       if (r.conflict) { eDirty = true; konflikt(r.conflict); return; }
       if (r.gone) { toast("To zapytanie zostało usunięte"); return go("zapytania"); }
-      eWersja = r.wersja || eWersja; status();
+      eWersja = r.wersja || eWersja; status(); if (dane.kod) dopiszProjekt(dane.kod);
     }).catch(x => { eDirty = true; failed(x); status("błąd zapisu"); }).finally(() => { eZapis = null; if (eDirty && !document.querySelector(".konflikt")) zmiana(); });
   return eZapis;
 }
