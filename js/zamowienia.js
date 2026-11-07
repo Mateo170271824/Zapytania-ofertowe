@@ -32,12 +32,21 @@ export function pozycjaDoKursu(tekst) {
   const jm = (il.reszta || "").split(/\s+/)[0] || (p >= 0 ? "" : "szt");
   return { nazwa, ilosc: il.w || 1, jm: jm || "szt" };
 }
+// Oddziały firmy, gdy Truck App nie ma własnej listy (ustawienia/publiczne.oddzialy) – jak ODDZIALY_DOM w Logistyce
+export const ODDZIALY_DOM = [{ nazwa: "Nowy Ochędzyn", adres: "" }, { nazwa: "Wieruszów", adres: "" }];
+// dostawca z listy Truck App (ustawienia/glowne.dostawcy: { nazwa, adres, tel, … }) – dokładnie po nazwie, potem po początku nazwy
+export function dostawcaTruck(nazwa, lista) {
+  const n = s => L.LC(s || "").replace(/[\s.\-_]/g, "");
+  const k = n(nazwa); if (!k) return null;
+  const L2 = (lista || []).filter(x => x && x.nazwa);
+  return L2.find(x => n(x.nazwa) === k) || L2.find(x => n(x.nazwa).startsWith(k) || k.startsWith(n(x.nazwa))) || null;
+}
 // dokument kursu i kosztów w formacie Logistyki (POLA_KURSU z src/dane.js)
-export function kursLogistyki({ nr, proj, kontr, transport, zal, dst, wagaT, pozycje, uwagi, kto, nazwa }, czas) {
+export function kursLogistyki({ nr, proj, kontr, transport, zal, dst, wagaT, pozycje, uwagi, kto, nazwa, miejsce = "", oddzial = "", kontakt = "" }, czas) {
   const dataS = zal || dst || "9999-12-31";
   const kurs = {
     typ: "D", rodzaj: "Dostawa – materiał", nr, proj, kontr, transport, spedytor: "", kier: "", nasz: "", kierUid: "", auto: "",
-    zal: zal || "", dst: dst || "", waga: wagaT ?? null, dlugosc: null, oddzial: "", miejsce: "", kraj: "", kontakt: "",
+    zal: zal || "", dst: dst || "", waga: wagaT ?? null, dlugosc: null, oddzial, miejsce, kraj: "", kontakt,
     status: "Oczekuje na kierowcę", uwagi, uwagiMag: "", ladunek: null, awizo: null, zrodlo: "ZAPYTANIE", hlId: "", hlIndeks: "", hlWeek: "",
     hlTydzien: false, godz: "", dojazd: null, przew: null, oddzial2: "", waga2: null, planId: "", punkty: [], doUzup: true,
     odZakupow: { kto, nazwa, czas: Date.now() }, zalMiejsce: "", opoznienie: "", protokol: null, pozycje, kierStatus: "",

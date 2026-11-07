@@ -38,6 +38,9 @@ await baza(async db => {
     slowa: [{ slowo: "PROFIL", grupa: "PROFILE" }],
     dostawcy: [{ dostawca: "Stal-Pol", email: "oferty@stalpol.example", wysylaj: "TAK", osoba: "" }, { dostawca: "Hurt Metal", email: "biuro@hurtmetal.example", wysylaj: "TAK", osoba: "" }],
   });
+  // Truck App: lista dostawców z adresami i oddziały (adres trafia do dostawy w Logistyce)
+  await setDoc(doc(db, "ustawienia/glowne"), { dostawcy: [{ nazwa: "HURT METAL", adres: "ul. Hutnicza 9, 00-009 Testowo", tel: "600 000 009" }] });
+  await setDoc(doc(db, "ustawienia/publiczne"), { oddzialy: [{ nazwa: "Oddział A", adres: "" }, { nazwa: "Oddział B", adres: "" }] });
   await setDoc(doc(db, "zap_ustawienia/wagi"), { rows: [{ t: "PROFIL", w: "120x80x3", kg: 8.75, o: "", u: "" }], pamiec: {} });
 });
 // eksport braków z Subiekta (wymyślony)
@@ -114,9 +117,13 @@ try {
     ok("zamówienie: nowa pozycja w bazie z ceną", d && d.historia?.[0]?.c === 4.9 && d.zrodlo === "zamowienie", JSON.stringify(d && { jm: d.jm, c: d.historia[0].c, skad: d.skad })); });
   ok("stan zamówienia nad dostawcą", (await txt(p, "#aGrid tr.r1")).includes("zam. ZD 7/" + rok));
   await zrzut(p, "arkusz");
-  await p.click(karta + ' [data-za="kurs"]'); await p.waitForSelector("#dlg[open]"); await dlgOk(p); await W(2500);
+  await p.click(karta + ' [data-za="kurs"]'); await p.waitForSelector("#dlg[open]");
+  ok("okno dostawy: adres z listy Truck App", (await p.$eval('#dlg input[name="miejsce"]', e => e.value)) === "ul. Hutnicza 9, 00-009 Testowo");
+  await p.selectOption('#dlg select[name="oddzial"]', "Oddział B");
+  await dlgOk(p); await W(2500);
   await baza(async db => { const s = await getDocs(collection(db, "kursy")); const d = s.docs[0]?.data() || {};
-    ok("dostawa w Logistyce (do uzupełnienia)", s.size === 1 && d.doUzup === true && d.kontr === "Hurt Metal" && d.pozycje?.length === 3, JSON.stringify({ kontr: d.kontr, poz: d.pozycje?.length, waga: d.waga })); });
+    ok("dostawa w Logistyce (do uzupełnienia)", s.size === 1 && d.doUzup === true && d.kontr === "Hurt Metal" && d.pozycje?.length === 3, JSON.stringify({ kontr: d.kontr, poz: d.pozycje?.length, waga: d.waga }));
+    ok("dostawa: adres, oddział i telefon dostawcy", d.miejsce === "ul. Hutnicza 9, 00-009 Testowo" && d.oddzial === "Oddział B" && d.kontakt === "600 000 009", JSON.stringify({ miejsce: d.miejsce, oddzial: d.oddzial, kontakt: d.kontakt })); });
   // 4. zapytanie na magazyn z ręczną pozycją
   await p.click("#tabs [data-v=zapytania]"); await W(400);
   await p.click("#lMag"); await p.waitForSelector("#wlN");

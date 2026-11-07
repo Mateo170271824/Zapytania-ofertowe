@@ -62,3 +62,16 @@ test("kopia Excel: arkusze jak w starym pliku + wybrany dostawca", () => {
   assert.deepEqual(a[0], ["KL", "Stal-Pol", "WYBRANY DOSTAWCA"]);
   assert.deepEqual(a[1], ["Profil- 2 szt", 50, "Stal-Pol"]);
 });
+
+test("dostawca z listy Truck App: adres po nazwie", async () => {
+  const ZM = await import("../js/zamowienia.js");
+  const lista = [{ nazwa: "HURT METAL", adres: "ul. Testowa 1, 00-001 Miasto", tel: "600 000 000" }, { nazwa: "Stal-Pol Wrocław", adres: "ul. Inna 2" }, { nazwa: "", adres: "x" }];
+  assert.equal(ZM.dostawcaTruck("Hurt Metal", lista)?.adres, "ul. Testowa 1, 00-001 Miasto");
+  assert.equal(ZM.dostawcaTruck("stal-pol", lista)?.nazwa, "Stal-Pol Wrocław");
+  assert.equal(ZM.dostawcaTruck("Nieznany", lista), null);
+  assert.equal(ZM.dostawcaTruck("", lista), null);
+  const { kurs } = ZM.kursLogistyki({ nr: "ZD 1", proj: "", kontr: "Hurt Metal", transport: "Dostawca", zal: "2026-12-01", dst: "", wagaT: 1, pozycje: [], uwagi: "", kto: "a", nazwa: "A", miejsce: "ul. Testowa 1", oddzial: "Wieruszów", kontakt: "600" }, "T");
+  assert.equal(kurs.miejsce, "ul. Testowa 1"); assert.equal(kurs.oddzial, "Wieruszów"); assert.equal(kurs.kontakt, "600");
+  const { kurs: k2 } = ZM.kursLogistyki({ nr: "ZD 1", kontr: "X", pozycje: [] }, "T");
+  assert.equal(k2.miejsce, ""); assert.equal(k2.oddzial, "");
+});
