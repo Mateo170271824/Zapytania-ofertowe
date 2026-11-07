@@ -55,3 +55,46 @@ export function kursLogistyki({ nr, proj, kontr, transport, zal, dst, wagaT, poz
   const koszt = { dataS, koszt: null, waluta: "PLN", dopl: null, faktura: null, oferty: null, zapytanie: null };
   return { kurs, koszt };
 }
+
+/* ---------------------------------------------------------------- zamówienie profili → Zakupy profili (Kombajn Zakupowca, kolekcja zak_zam)
+   Pozycja zapytania „Profil 50x50x2,5 S355 4800- 20 szt” → indeks Zakupów „50x50x2,5 / 4800”, tony z wagi, cena w zł/t. */
+const liczba = s => Number(String(s).replace(",", "."));
+// wymiary profilu z tekstu: { a, b, g, dl } (dl w mm albo null)
+export function wymiarProfilu(tekst) {
+  const t = String(tekst || "").replace(/×/g, "x");
+  const m = t.match(/(\d+(?:[.,]\d+)?)\s*x\s*(\d+(?:[.,]\d+)?)\s*x\s*(\d+(?:[.,]\d+)?)/i);
+  if (!m) return null;
+  const [a, b] = [liczba(m[1]), liczba(m[2])].sort((x, y) => y - x), g = liczba(m[3]);
+  const reszta = t.slice(m.index + m[0].length);
+  let dl = null;
+  const mm = reszta.match(/(?:^|[^\d,.])(\d{4,5})(?:\s*mm)?(?![\d,.])/);
+  const mt = reszta.match(/(\d+(?:[.,]\d+)?)\s*m(?![a-ząćęłńóśźż])/i);
+  if (mm) dl = +mm[1]; else if (mt && liczba(mt[1]) >= 1 && liczba(mt[1]) <= 18) dl = Math.round(liczba(mt[1]) * 1000);
+  return { a, b, g, dl };
+}
+// indeks z listy Zakupów (cfg.skus[].key) – jednoznaczne dopasowanie wymiarów i długości, inaczej ""
+export function dopasujIndeks(tekst, klucze) {
+  const p = wymiarProfilu(tekst); if (!p) return "";
+  const pasuje = (klucze || []).filter(k => { const s = wymiarProfilu(k); return s && s.a === p.a && s.b === p.b && s.g === p.g && (p.dl == null || s.dl === p.dl); });
+  return pasuje.length === 1 ? pasuje[0] : "";
+}
+// cena w zł/t z ceny dostawcy za jednostkę pozycji (t, kg, szt, mb…) i wagi pozycji w kg
+export function cenaZaTone(cena, jm, ilosc, wagaKg) {
+  const c = Number(cena), j = String(jm || "").toLowerCase().replace(".", "");
+  if (!(c > 0)) return null;
+  if (j === "t" || j === "ton") return Math.round(c * 100) / 100;
+  if (j === "kg") return Math.round(c * 1000 * 100) / 100;
+  if (Number(ilosc) > 0 && Number(wagaKg) > 0) return Math.round(c * Number(ilosc) / (Number(wagaKg) / 1000) * 100) / 100;
+  return null;
+}
+// dostawca z listy Zakupów (cfg.suppliers) po nazwie (bez wielkości liter, spacji, polskich znaków)
+export function dostawcaZakupow(nazwa, lista) {
+  const n = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ł/g, "l").replace(/[^a-z0-9]/g, "");
+  const k = n(nazwa); if (!k) return "";
+  return (lista || []).find(x => n(x) === k) || (lista || []).find(x => n(x).startsWith(k) || k.startsWith(n(x))) || "";
+}
+// dokumenty zak_zam (format Zakupów profili: { nr, sup, date, zd, term, price, closed, note, key, t })
+export function zamowieniaZakupow(wiersze, H) {
+  return wiersze.filter(w => w.key && Number(w.t) > 0).map(w => ({ nr: H.nr || "", sup: H.sup, date: H.date || "", zd: H.zd || "", term: H.term || "",
+    price: Number(w.price) > 0 ? Number(w.price) : 0, closed: false, note: H.note || "", key: w.key, t: Math.round(Number(w.t) * 1000) / 1000 }));
+}

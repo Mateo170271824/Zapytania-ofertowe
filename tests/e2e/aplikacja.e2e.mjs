@@ -41,6 +41,8 @@ await baza(async db => {
   // Truck App: lista dostawców z adresami i oddziały (adres trafia do dostawy w Logistyce)
   await setDoc(doc(db, "ustawienia/glowne"), { dostawcy: [{ nazwa: "HURT METAL", adres: "ul. Hutnicza 9, 00-009 Testowo", tel: "600 000 009" }] });
   await setDoc(doc(db, "ustawienia/publiczne"), { oddzialy: [{ nazwa: "Oddział A", adres: "" }, { nazwa: "Oddział B", adres: "" }] });
+  // Zakupy profili (Kombajn Zakupowca): indeksy profili i dostawcy
+  await setDoc(doc(db, "zak_cfg/main"), { skus: [{ key: "120x80x3 / 6000" }, { key: "120x80x3 / 12000" }, { key: "60x60x4 / 6000" }], suppliers: ["Stal-Pol", "Hurt Metal"] });
   await setDoc(doc(db, "zap_ustawienia/wagi"), { rows: [{ t: "PROFIL", w: "120x80x3", kg: 8.75, o: "", u: "" }], pamiec: {} });
 });
 // eksport braków z Subiekta (wymyślony)
@@ -124,6 +126,15 @@ try {
   await baza(async db => { const s = await getDocs(collection(db, "kursy")); const d = s.docs[0]?.data() || {};
     ok("dostawa w Logistyce (do uzupełnienia)", s.size === 1 && d.doUzup === true && d.kontr === "Hurt Metal" && d.pozycje?.length === 3, JSON.stringify({ kontr: d.kontr, poz: d.pozycje?.length, waga: d.waga }));
     ok("dostawa: adres, oddział i telefon dostawcy", d.miejsce === "ul. Hutnicza 9, 00-009 Testowo" && d.oddzial === "Oddział B" && d.kontakt === "600 000 009", JSON.stringify({ miejsce: d.miejsce, oddzial: d.oddzial, kontakt: d.kontakt })); });
+  // 3b. pozycje profili do Zakupów profili
+  await p.click(karta + ' [data-za="zak"]'); await p.waitForSelector("#dlg[open]");
+  ok("Zakupy: dostawca dopasowany", (await p.$eval('#dlg select[name="sup"]', e => e.value)) === "Hurt Metal");
+  const ind = await p.$$eval('#dlg select[name^="key"]', L => L.map(e => e.value));
+  ok("Zakupy: indeks profilu dopasowany, reszta pominięta", ind.filter(Boolean).length === 1 && ind.includes("120x80x3 / 6000"), JSON.stringify(ind));
+  await dlgOk(p); await W(2500);
+  await baza(async db => { const L = (await getDocs(collection(db, "zak_zam"))).docs.map(x => x.data());
+    ok("Zakupy: zamówienie zapisane (indeks, tony, ZD, dostawca)", L.length === 1 && L[0].key === "120x80x3 / 6000" && Math.abs(L[0].t - 0.21) < 0.001 && L[0].zd === "ZD 7/" + rok && L[0].sup === "Hurt Metal", JSON.stringify(L[0])); });
+  ok("Zakupy: znacznik w karcie zamówienia", (await txt(p, karta)).includes("w Zakupach profili: 1 poz."));
   // 4. zapytanie na magazyn z ręczną pozycją
   await p.click("#tabs [data-v=zapytania]"); await W(400);
   await p.click("#lMag"); await p.waitForSelector("#wlN");
