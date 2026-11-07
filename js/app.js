@@ -529,30 +529,39 @@ function wartWyswietl(c, kol) {
   return String(c.v ?? "");
 }
 const wartEdycja = c => !c ? "" : c.f ? c.f : typeof c.v === "number" ? L.ogolny(c.v) : String(c.v ?? "");
+// pod nazwą dostawcy: ile pozycji wybrano i stan zamówienia (zamówiono / dostawa w Logistyce / dostarczono)
+function stanDostawcy(c, n) {
+  const k = L.kolor(n.k); if (k === -1 || !L.vbaTrim(n.t || "")) return "";
+  const ile = E.wiersze.filter(w => L.vbaTrim(w.a) && (L.kolor(w.k) === k || L.kolor(w.c?.[c]?.k) === k)).length;
+  const z = (E.zamowienia || {})[k] || {}, kurs = z.kursId ? kursySub.get(z.kursId)?.dane : null;
+  const [kl, t] = (kurs?.status === "Dostarczone" || z.status === "dostarczono") ? ["p-ok", "dostarczono"] : z.kursId ? ["p-acc", "w Logistyce"] : z.status === "zamowiono" ? ["p-warn", z.nr ? "zam. " + z.nr : "zamówiono"] : ["p-idle", "nie zamówiono"];
+  return `<div class="zst"><span>${ile} poz.</span><span class="pill ${kl}">${esc(t)}</span></div>`;
+}
 function rysujArkusz() {
   const g = $("aGrid"); if (!g || !E) return;
-  const ostK = Math.max(L.ostKolumna(E), 4), nW = Math.max(E.wiersze.length + 3, 12);
+  const ostK = Math.max(L.ostKolumna(E), 4), nW = Math.max(E.wiersze.length + 3, 6);
   const naglowki = E.naglowki || {};
   // szerokość kolumny dopasowana do najdłuższego tekstu (nagłówek albo komórka), 160–320 px
   const tel = innerWidth < 700;      // na telefonie wąska kolumna A (zawija tekst), żeby było widać ceny
   const szer = c => { let n = String(naglowki[c]?.t ?? "").length; for (const w of E.wiersze) n = Math.max(n, wartWyswietl(w.c?.[c], c).length); return tel ? szerKol(n * 0.85, 96, 170) : szerKol(n, 160, 320); };
   const szerA = tel ? Math.round(Math.min(150, Math.max(118, innerWidth * 0.36))) : szerKol(Math.max(String(E.kod ?? "").length, ...E.wiersze.map(w => Math.max(...String(w.a ?? "").split("\n").map(l => l.length)))), 300, 560);
-  let h = `<table class="ark"><thead><tr><th class="rn"></th><th style="position:sticky;left:${tel ? 26 : 34}px;z-index:4;width:${szerA}px;min-width:${szerA}px">A</th>${Array.from({ length: ostK - 1 }, (_, i) => { const w = szer(i + 2); return `<th style="width:${w}px;min-width:${w}px">${kolLit(i + 2)}</th>`; }).join("")}<th></th></tr></thead><tbody>`;
+  let h = `<table class="ark ark2"><thead><tr><th class="rn"></th><th style="position:sticky;left:${tel ? 26 : 34}px;z-index:4;width:${szerA}px;min-width:${szerA}px">A</th>${Array.from({ length: ostK - 1 }, (_, i) => { const w = szer(i + 2); return `<th style="width:${w}px;min-width:${w}px" title="kolumna ${kolLit(i + 2)}">${kolLit(i + 2)}</th>`; }).join("")}<th></th></tr></thead><tbody>`;
   // wiersz 1: kod klienta + dostawcy
-  h += `<tr class="r1"><td class="rn">1</td><td class="a" data-r="1" data-c="1">${E.kodM ? '<span class="km" title="' + esc(E.kodM) + '"></span>' : ""}<input value="${esc(E.kod)}" data-r="1" data-c="1" aria-label="A1 kod klienta"></td>`;
+  h += `<tr class="r1"><td class="rn" title="wiersz 1"></td><td class="a" data-r="1" data-c="1">${E.kodM ? '<span class="km" title="' + esc(E.kodM) + '"></span>' : ""}<input value="${esc(E.kod)}" data-r="1" data-c="1" aria-label="A1 kod klienta"></td>`;
   for (let c = 2; c <= ostK; c++) {
     const n = naglowki[c] || {}, k = L.kolor(n.k);
-    h += `<td class="c ${k !== -1 ? "kol" : ""}" data-r="1" data-c="${c}" style="${k !== -1 ? `background:${hex(k)}` : ""}">${n.m ? `<span class="km" title="${esc(n.m)}"></span>` : ""}<input class="txt" value="${esc(n.t ?? "")}" data-r="1" data-c="${c}" list="dostList" aria-label="${kolLit(c)}1 dostawca"></td>`;
+    h += `<td class="c dost ${k !== -1 ? "kol" : ""}" data-r="1" data-c="${c}" style="${k !== -1 ? `--k:${hex(k)}` : ""}">${n.m ? `<span class="km" title="${esc(n.m)}"></span>` : ""}<input class="txt" value="${esc(n.t ?? "")}" data-r="1" data-c="${c}" list="dostList" aria-label="${kolLit(c)}1 dostawca" placeholder="dostawca">${stanDostawcy(c, n)}</td>`;
   }
   h += `<td class="plus" rowspan="1"><button class="btn sm" id="aDodajKol" title="Dodaj kolumnę dostawcy">+</button></td></tr>`;
   for (let i = 0; i < nW; i++) {
     const w = E.wiersze[i] || { a: "", c: {} }, r = i + 2, kA = L.kolor(w.k);
     const skr = L.skrajneCeny(w, 30);
-    h += `<tr><td class="rn">${r}</td><td class="a ${kA !== -1 ? "kol" : ""}" data-r="${r}" data-c="1" style="${kA !== -1 ? `background:${hex(kA)}` : ""}">${w.m ? `<span class="km" title="${esc(w.m)}"></span>` : ""}<textarea rows="1" data-r="${r}" data-c="1" aria-label="A${r}">${esc(w.a)}</textarea></td>`;
+    h += `<tr><td class="rn" title="wiersz ${r}">${L.vbaTrim(w.a) ? r - 1 : ""}</td><td class="a ${kA !== -1 ? "kol" : ""}" data-r="${r}" data-c="1" style="${kA !== -1 ? `--k:${hex(kA)}` : ""}">${w.m ? `<span class="km" title="${esc(w.m)}"></span>` : ""}<textarea rows="1" data-r="${r}" data-c="1" aria-label="A${r}">${esc(w.a)}</textarea></td>`;
     for (let c = 2; c <= ostK; c++) {
       const cel = w.c?.[c], kc = L.kolor(cel?.k), cls = skr.min.has(c) ? "min" : skr.max.has(c) ? "max" : "";
+      const kw = kc !== -1 ? kc : (kA !== -1 && L.kolor(naglowki[c]?.k) === kA ? kA : -1);     // cena wybranego dostawcy w tym wierszu
       const txt = cel && typeof cel.v !== "number" && !cel.f;
-      h += `<td class="c ${cls} ${kc !== -1 && !cls ? "kol" : ""}" data-r="${r}" data-c="${c}" style="${kc !== -1 && !cls ? `background:${hex(kc)}` : ""}">${cel?.m ? `<span class="km" title="${esc(cel.m)}"></span>` : ""}<input class="${txt ? "txt" : ""}" value="${esc(wartWyswietl(cel, c))}" data-r="${r}" data-c="${c}" inputmode="decimal" aria-label="${kolLit(c)}${r}"></td>`;
+      h += `<td class="c ${cls} ${kc !== -1 && !cls ? "kol" : ""} ${kw !== -1 ? "wyb" : ""}" data-r="${r}" data-c="${c}" style="${kw !== -1 ? `--k:${hex(kw)}` : ""}">${cel?.m ? `<span class="km" title="${esc(cel.m)}"></span>` : ""}<input class="${txt ? "txt" : ""}" value="${esc(wartWyswietl(cel, c))}" data-r="${r}" data-c="${c}" inputmode="decimal" aria-label="${kolLit(c)}${r}"></td>`;
     }
     h += `<td></td></tr>`;
   }
@@ -584,6 +593,7 @@ function obserwujKurs(id) {
   o.unsub = B.watchDoc("kursy", id, d => { o.dane = d; if (widok.nazwa === "z") rysujZamowienia(); }, () => { o.dane = { brakDostepu: true }; });
 }
 function rysujZamowienia() {
+  odswiezNaglowki();
   const el = $("aZam"); if (!el || !E) return;
   const grupy = ZM.grupyZamowien(E, { wagi: L.slownikWag(W), pamiec: W.pamiec || {} });
   if (!grupy.length) { el.innerHTML = `<div class="hd"><h3>Zamówienia</h3><span class="small">Pojawią się tu, gdy wybierzesz dostawców kolorem.</span></div>`; return; }
@@ -650,7 +660,11 @@ document.addEventListener("click", async e => {
     } catch (x) { if (String(x?.code).includes("permission")) okno(`<h3>Brak uprawnień</h3><p>Dostawy w Logistyce może tworzyć tylko konto biura. To konto nie ma tej roli.</p>`); else failed(x); }
   }
 });
+function odswiezNaglowki() {
+  $("aGrid")?.querySelectorAll("td.dost").forEach(td => { const c = +td.dataset.c, n = (E.naglowki || {})[c] || {}; td.querySelector(".zst")?.remove(); td.insertAdjacentHTML("beforeend", stanDostawcy(c, n)); });
+}
 function legenda() {
+  odswiezNaglowki();
   const el = $("aLegenda"); if (!el) return;
   const wyb = Object.entries(E.naglowki || {}).filter(([, h]) => L.kolor(h.k) !== -1);
   el.innerHTML = `<span><span class="sw" style="background:var(--min-bg)"></span>najniższa cena w wierszu</span><span><span class="sw" style="background:var(--max-bg)"></span>najwyższa</span>` +
@@ -707,9 +721,22 @@ document.addEventListener("focusin", e => {
   const el = e.target.closest?.("table.ark input, table.ark textarea"); if (!el) return;
   const r = +el.dataset.r, c = +el.dataset.c;
   fokus = { r, c };
-  if (r >= 2 && c >= 2) el.value = wartEdycja(E.wiersze[r - 2]?.c?.[c]);
+  if (r >= 2 && c >= 2) { el.value = wartEdycja(E.wiersze[r - 2]?.c?.[c]); el.select(); if (Date.now() - ostatniDotyk < 800) setTimeout(() => { if (document.activeElement === el && !el.dataset.edycja && el.selectionStart === el.selectionEnd) el.select(); }, 60); }   // jak w Excelu: wpisanie zastępuje wartość
   if (!wybor) pokazPasek(el, r, c);
 });
+// myszką: pojedyncze kliknięcie zaznacza całą cenę (wpisanie zastępuje), podwójne – edycja istniejącej wartości
+let ostatniDotyk = 0;
+document.addEventListener("pointerdown", e => {
+  if (e.pointerType === "touch") ostatniDotyk = Date.now();
+  if (e.pointerType !== "mouse" || wybor) return;
+  const el = e.target.closest?.("table.ark td.c input"); if (!el || +el.dataset.r < 2 || document.activeElement === el) return;
+  e.preventDefault(); el.focus();
+});
+document.addEventListener("dblclick", e => {
+  const el = e.target.closest?.("table.ark td.c input"); if (!el || +el.dataset.r < 2) return;
+  el.dataset.edycja = "1"; const n = el.value.length; el.setSelectionRange(n, n);
+});
+document.addEventListener("focusout", e => { const el = e.target.closest?.("table.ark td.c input"); if (el) delete el.dataset.edycja; }, true);
 document.addEventListener("focusout", e => {
   const el = e.target.closest?.("table.ark input, table.ark textarea"); if (!el || !E) return;
   const r = +el.dataset.r, c = +el.dataset.c;
@@ -746,7 +773,8 @@ function odswiezWiersz(r) {
     const c = +td.dataset.c, cel = w.c?.[c], kc = L.kolor(cel?.k);
     td.classList.toggle("min", skr.min.has(c)); td.classList.toggle("max", skr.max.has(c));
     const cls = skr.min.has(c) || skr.max.has(c);
-    td.classList.toggle("kol", kc !== -1 && !cls); td.style.background = kc !== -1 && !cls ? hex(kc) : "";
+    const kA = L.kolor(w.k), kw = kc !== -1 ? kc : (kA !== -1 && L.kolor(E.naglowki?.[c]?.k) === kA ? kA : -1);
+    td.classList.toggle("kol", kc !== -1 && !cls); td.classList.toggle("wyb", kw !== -1); td.style.setProperty("--k", kw !== -1 ? hex(kw) : "");
     const inp = td.querySelector("input"); if (inp && document.activeElement !== inp) { inp.value = wartWyswietl(cel, c); inp.classList.toggle("txt", !!cel && typeof cel.v !== "number" && !cel.f); }
   });
   legenda();

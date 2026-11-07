@@ -259,3 +259,29 @@ rect.sp-p2{--d:1s}rect.sp-p4{--d:1.05s}rect.sp-p9{--d:1.4s}
 .pomoc-inne{margin-top:12px;border-top:1px solid var(--line, #ddd);padding-top:8px}
 .pomoc-inne summary{cursor:pointer;font-weight:600}
 .pomoc-inne h4{margin:14px 0 4px}
+
+/* ===== arkusz zapytania bez siatki Excela: ten sam układ (pozycje × dostawcy), lżejszy wygląd */
+table.ark2 th,table.ark2 td{border-right:0;border-bottom:1px solid color-mix(in srgb,var(--line) 55%,transparent)}
+table.ark2 thead th{font-size:0;padding:0;height:0;line-height:0;border:0;background:var(--surface)}
+table.ark2 .rn{background:var(--surface);color:var(--muted);font:500 11.5px var(--f-mono);vertical-align:top;padding-top:9px}
+table.ark2 tbody tr:hover td{background-color:color-mix(in srgb,var(--sunk) 55%,var(--surface))}
+table.ark2 td.a{background:var(--surface)}
+table.ark2 td.a textarea{font-weight:500}
+table.ark2 td.a.kol{background:color-mix(in srgb,var(--k) 20%,var(--surface));box-shadow:inset 4px 0 0 var(--k)}
+table.ark2 td.kol input,table.ark2 td.kol textarea{color:inherit}
+/* wiersz dostawców */
+table.ark2 tr.r1 td{background:var(--sunk);border-bottom:2px solid var(--line);vertical-align:top}
+table.ark2 tr.r1 td.a input{font:600 13px var(--f-mono);color:var(--muted)}
+table.ark2 tr.r1 td.dost input{font-weight:700;font-size:14px;text-align:left}
+table.ark2 tr.r1 td.dost.kol{background:color-mix(in srgb,var(--k) 22%,var(--sunk));box-shadow:inset 0 4px 0 var(--k)}
+table.ark2 .zst{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:0 8px 7px;font-size:11.5px;font-weight:500;color:var(--muted)}
+table.ark2 .zst .pill{font-size:11px;padding:1px 7px}
+/* ceny jako zaokrąglone pola */
+table.ark2 td.c:not(.dost) input{margin:3px 5px;width:calc(100% - 10px);border-radius:7px;min-height:28px}
+table.ark2 td.min,table.ark2 td.max,table.ark2 td.c.kol:not(.dost){background:transparent!important}
+table.ark2 td.min input{background:var(--min-bg);font-weight:600}
+table.ark2 td.max input{background:var(--max-bg)}
+table.ark2 td.c.kol:not(.dost) input{background:color-mix(in srgb,var(--k) 30%,var(--surface))}
+table.ark2 td.c.wyb input{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--k) 75%,#000);font-weight:700}
+table.ark2 td.c.wyb::before{content:"✓";position:absolute;left:8px;top:50%;transform:translateY(-50%);font:700 12px sans-serif;color:color-mix(in srgb,var(--k) 55%,#000);pointer-events:none;z-index:1}
+table.ark2 td.plus{background:var(--sunk)}

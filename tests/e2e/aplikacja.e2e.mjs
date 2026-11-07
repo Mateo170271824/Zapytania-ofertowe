@@ -71,6 +71,7 @@ async function zaloguj(p, l) { await p.waitForSelector("#v-login:not([hidden])")
 const dlgOk = async (p, v = "ok") => { await p.waitForSelector("#dlg[open]"); await p.click(`#dlg button[value="${v}"]`); await W(150); };
 const txt = async (p, s) => (await p.$eval(s, e => e.innerText)).replace(/ /g, " ");
 const rok = new Date().getFullYear();
+const zrzut = async (p, n) => { if (process.env.ZRZUTY) await p.screenshot({ path: join(process.env.ZRZUTY, n + ".png"), fullPage: true }); };
 
 try {
   let p = await strona(); await zaloguj(p, "wlasciciel");
@@ -107,6 +108,8 @@ try {
   await p.click(karta + ' [data-za="zam"]'); await p.waitForSelector("#dlg[open]");
   await p.fill('#dlg input[name="nr"]', "ZD 7/" + rok); await p.fill('#dlg input[name="dostawa"]', `${rok}-12-01`); await dlgOk(p); await W(2000);
   ok("zamówiono", (await txt(p, karta)).includes("ZD 7/" + rok));
+  ok("stan zamówienia nad dostawcą", (await txt(p, "#aGrid tr.r1")).includes("zam. ZD 7/" + rok));
+  await zrzut(p, "arkusz");
   await p.click(karta + ' [data-za="kurs"]'); await p.waitForSelector("#dlg[open]"); await dlgOk(p); await W(2500);
   await baza(async db => { const s = await getDocs(collection(db, "kursy")); const d = s.docs[0]?.data() || {};
     ok("dostawa w Logistyce (do uzupełnienia)", s.size === 1 && d.doUzup === true && d.kontr === "Hurt Metal" && d.pozycje?.length === 2, JSON.stringify({ kontr: d.kontr, poz: d.pozycje?.length, waga: d.waga })); });
@@ -149,6 +152,9 @@ try {
   ok("zastępca: skrót „od czego zacząć”", (await txt(p, "#dlg")).includes("od czego zacząć")); await dlgOk(p);
   await p.click("#tabs [data-v=zapytania]"); await W(500); await p.fill("#lQ", `1-${rok}`); await p.keyboard.press("Enter"); await p.waitForSelector("#aGrid table");
   await p.click('#aGrid input[data-r="2"][data-c="2"]'); await p.keyboard.type("57"); await p.keyboard.press("Enter"); await W(1800);
+  await zrzut(p, "arkusz-telefon");
+  const b2 = await p.$eval('#aGrid input[data-r="2"][data-c="2"]', e => e.value.replace(/\u00a0/g, " "));
+  ok("wpisanie zastępuje cenę (jak w Excelu)", b2 === "57,00 zł", b2);
   ok("zastępca zapisał cenę", (await p.$eval("#aStatus", e => e.textContent)).includes("zapisano"));
   await p.click("#btnOut"); await p.close();
   p = await strona(); await zaloguj(p, "wlasciciel"); await W(1500);
