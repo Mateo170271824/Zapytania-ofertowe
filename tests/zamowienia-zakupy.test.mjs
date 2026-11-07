@@ -38,3 +38,15 @@ test("dostawca z listy Zakupów i dokumenty zamówienia", () => {
   assert.equal(L.length, 1);
   assert.deepEqual(L[0], { nr: "", sup: "Huta Pokój", date: "2026-11-07", zd: "ZD 5/11/2026", term: "2026-11-20", price: 3800, closed: false, note: "z zapytania 12-2026", key: "50x50x2,5 / 4800", t: 12.5 });
 });
+
+test("jedna lista dostawców: dopisanie do kartoteki Truck App bez nadpisywania", () => {
+  const T = [{ nazwa: "HUTA POKÓJ", adres: "ul. Hallera 70", email: "", kontakt: "" }, { nazwa: "Stal-Pol", adres: "", email: "biuro@stalpol.example", kontakt: "Jan" }];
+  const r = ZM.scalDostawcow(T, [{ nazwa: "Huta Pokoj", email: "oferty@huta.example", osoba: "Ewa" }, { nazwa: "Stal-Pol", email: "inny@x.example" }, { nazwa: "Nowa Hurtownia", email: "n@x.example" }, { nazwa: "" }], "zap");
+  const h = r.lista.find(x => x.nazwa === "HUTA POKÓJ"), s = r.lista.find(x => x.nazwa === "Stal-Pol"), n = r.lista.find(x => x.nazwa === "Nowa Hurtownia");
+  assert.equal(h.email, "oferty@huta.example"); assert.equal(h.kontakt, "Ewa"); assert.equal(h.adres, "ul. Hallera 70"); assert.equal(h.zap, true);
+  assert.equal(s.email, "biuro@stalpol.example"); assert.equal(s.kontakt, "Jan");      // nie nadpisuje
+  assert.deepEqual(n, { nazwa: "Nowa Hurtownia", adres: "", nip: "", tel: "", kontakt: "", email: "n@x.example", zap: true });
+  assert.equal(r.lista.length, 3); assert.equal(T[0].email, "");                           // wejście bez zmian
+  assert.equal(ZM.scalDostawcow(r.lista, [{ nazwa: "Stal-Pol" }], "zak").zmiany, 1);       // tylko nowa flaga (inna aplikacja)
+  assert.equal(ZM.scalDostawcow(r.lista, [{ nazwa: "Huta Pokój", email: "x" }], "zap").zmiany, 0);
+});

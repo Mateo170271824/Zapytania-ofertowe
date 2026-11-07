@@ -1308,6 +1308,7 @@ async function wgrajListeCen(f) {
 
 /* ============================================================ ustawienia */
 let ustDirty = false, UE = null, WE = null, wagiQ = "";
+let truckDost = null;   // kartoteka dostawców Truck App (podpowiedzi w Ustawieniach)
 function renderUstawienia() {
   if (!ustDirty) { UE = clone(U); WE = clone(W); }
   const pole = (k, l, opis, typ = "text") => `<label>${l}<input data-u="${k}" value="${esc(UE[k] ?? "")}" ${typ === "tn" ? 'list="tnList"' : ""}><span class="small">${opis}</span></label>`;
@@ -1363,6 +1364,18 @@ function renderUstawienia() {
   ${isOwner ? `<div class="panel"><div class="hd"><h3>Import z pliku Excel</h3></div><div class="bd"><div class="drop"><b>Wgraj „Zapytania Lista 2026.xlsm”</b><span>Przeniesie wszystkie zapytania (ceny, kolory wyboru, komentarze), projekty, tabelę wag, zapamiętane paczki, listę generatora i ustawienia. Plik jest czytany w przeglądarce – nie trafia nigdzie poza bazę aplikacji.</span>
     <label class="btn primary filebtn">Wybierz plik<input type="file" id="impFile" accept=".xlsm,.xlsx"></label></div></div></div>` : ""}`;
   M().querySelectorAll("[data-u]").forEach(el => el.oninput = () => { UE[el.dataset.u] = el.value; ustZm(); });
+  // podpowiedzi z kartoteki dostawców Truck App: nazwa z listy uzupełnia pusty e-mail i osobę
+  const tbD = M().querySelector('table[data-tab="dostawcy"]');
+  if (tbD) {
+    const dolacz = () => { tbD.querySelectorAll('input[data-f="dostawca"]').forEach(i => i.setAttribute("list", "truckDost"));
+      if (!$("truckDost")) tbD.insertAdjacentHTML("afterend", `<datalist id="truckDost">${(truckDost || []).map(x => `<option value="${esc(x.nazwa)}">${esc(x.email || x.adres || "")}</option>`).join("")}</datalist>`); };
+    if (truckDost) dolacz(); else B.get("ustawienia", "glowne").then(d => { truckDost = d?.dostawcy || []; dolacz(); }).catch(() => { truckDost = []; });
+    tbD.addEventListener("change", e => { if (e.target.dataset.f !== "dostawca") return; const tr = e.target.closest("tr[data-i]"); const x = ZM.dostawcaTruck(e.target.value, truckDost || []); if (!tr || !x) return;
+      const w = UE.dostawcy[+tr.dataset.i]; let zm = false;
+      if (!w.email && x.email) { w.email = x.email; tr.querySelector('input[data-f="email"]').value = x.email; zm = true; }
+      if (!w.osoba && x.kontakt && !/\d{3}/.test(x.kontakt)) { w.osoba = x.kontakt; tr.querySelector('input[data-f="osoba"]').value = x.kontakt; zm = true; }
+      if (zm) { ustZm(); toast("Uzupełniono z kartoteki dostawców Truck App"); } });
+  }
   M().querySelectorAll("table[data-tab]").forEach(tb => {
     const k = tb.dataset.tab;
     tb.oninput = e => { const tr = e.target.closest("tr[data-i]"); if (!tr) return; UE[k][+tr.dataset.i][e.target.dataset.f] = e.target.value; ustZm(); };
@@ -1414,8 +1427,14 @@ async function zapiszUstawienia() {
   if (JSON.stringify(WE.pamiec) !== JSON.stringify(W.pamiec)) zmW.push({ p: "zapamiętane paczki/arkusze", a: Object.keys(W.pamiec).length + "", b: Object.keys(WE.pamiec).length + "" });
   try {
     if (zm.length) await zapiszUst("config", UE, "USTAWIENIA", zm);
+    // jedna lista dostawców: nowi dostawcy i brakujące e-maile trafiają do kartoteki w Truck App
+    let wTruck = 0;
+    if (zm.some(z => z.p === "dostawcy")) {
+      try { wTruck = await B.zmienDostawcowTruck(l => ZM.scalDostawcow(l, (UE.dostawcy || []).map(d => ({ nazwa: L.vbaTrim(d.dostawca || ""), email: L.vbaTrim(d.email || ""), osoba: L.vbaTrim(d.osoba || "") })), "zap")); }
+      catch (x) { console.warn(x); wTruck = -1; }
+    }
     if (zmW.length) await zapiszUst("wagi", WE, "WAGI", zmW);
-    ustDirty = false; toast("Zapisano ustawienia"); renderUstawienia();
+    ustDirty = false; toast("Zapisano ustawienia" + (wTruck > 0 ? " – dostawcy także w kartotece Truck App" : wTruck < 0 ? " (kartoteka Truck App bez zmian – brak dostępu)" : "")); renderUstawienia();
   } catch (x) { failed(x); }
 }
 // ---------- kopia zapasowa

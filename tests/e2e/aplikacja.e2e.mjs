@@ -1,7 +1,7 @@
 // Test ekranowy całej aplikacji na emulatorze Firebase i wymyślonych danych.
 // Uruchomienie: npm run test:e2e (wymaga Javy; instaluje firebase-tools, playwright).
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { doc, setDoc, getDocs, deleteDoc, collection } from "firebase/firestore";
+import { doc, setDoc, getDoc, getDocs, deleteDoc, collection } from "firebase/firestore";
 import { createRequire } from "node:module";
 import { readFileSync, mkdtempSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -151,6 +151,16 @@ try {
   await dlgOk(p);
   // 6. kopia zapasowa i przywrócenie
   await p.click("#tabs [data-v=ustawienia]"); await W(600);
+  // 5b. jedna lista dostawców: nowy dostawca w Zapytaniach → kartoteka Truck App (bez nadpisywania)
+  await p.click('[data-dodaj="dostawcy"]'); await W(300);
+  const wiersze = p.locator('table[data-tab="dostawcy"] tbody tr');
+  const ost = wiersze.nth((await wiersze.count()) - 1);
+  await ost.locator('input[data-f="dostawca"]').fill("Nowa Hurtownia"); await ost.locator('input[data-f="email"]').fill("nowa@hurtownia.example");
+  await p.click("#uZapisz"); await W(2000);
+  await baza(async db => { const L = (await getDoc(doc(db, "ustawienia/glowne"))).data().dostawcy;
+    const n = L.find(x => x.nazwa === "Nowa Hurtownia"), h = L.find(x => x.nazwa === "HURT METAL");
+    ok("kartoteka Truck App: nowy dostawca z Zapytań", n && n.email === "nowa@hurtownia.example" && n.zap === true, JSON.stringify(n));
+    ok("kartoteka Truck App: istniejącemu uzupełniony e-mail, adres bez zmian", h && h.email === "biuro@hurtmetal.example" && h.adres === "ul. Hutnicza 9, 00-009 Testowo", JSON.stringify(h)); });
   const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#kpJson")]);
   const plikKopii = join(TMP, "kopia.json"); await dl.saveAs(plikKopii);
   const k = JSON.parse(readFileSync(plikKopii, "utf8"));
