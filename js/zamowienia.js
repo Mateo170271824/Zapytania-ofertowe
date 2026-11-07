@@ -98,3 +98,22 @@ export function zamowieniaZakupow(wiersze, H) {
   return wiersze.filter(w => w.key && Number(w.t) > 0).map(w => ({ nr: H.nr || "", sup: H.sup, date: H.date || "", zd: H.zd || "", term: H.term || "",
     price: Number(w.price) > 0 ? Number(w.price) : 0, closed: false, note: H.note || "", key: w.key, t: Math.round(Number(w.t) * 1000) / 1000 }));
 }
+
+/* ---------------------------------------------------------------- jedna lista dostawców (kartoteka w Truck App: ustawienia/glowne.dostawcy)
+   Dostawcy z Zapytań dopisują się do kartoteki; istniejącym uzupełniamy tylko puste pola (e-mail, osoba). Niczego nie usuwamy ani nie nadpisujemy. */
+const nNazwa = s => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ł/g, "l").replace(/[^a-z0-9]/g, "");
+// wpisy: [{ nazwa, email, osoba }]; flaga – skąd dostawca (np. "zap"); zwraca { lista, zmiany }
+export function scalDostawcow(lista, wpisy, flaga) {
+  const L = (lista || []).map(x => ({ ...x })); let zmiany = 0;
+  for (const w of wpisy || []) {
+    const nazwa = String(w.nazwa || "").trim(); if (!nazwa) continue;
+    const x = L.find(q => nNazwa(q.nazwa) === nNazwa(nazwa));
+    if (x) {
+      if (w.email && !x.email) { x.email = w.email; zmiany++; }
+      if (w.osoba && !x.kontakt) { x.kontakt = w.osoba; zmiany++; }
+      if (flaga && !x[flaga]) { x[flaga] = true; zmiany++; }
+    } else { L.push({ nazwa, adres: "", nip: "", tel: "", kontakt: w.osoba || "", email: w.email || "", ...(flaga ? { [flaga]: true } : {}) }); zmiany++; }
+  }
+  if (zmiany) L.sort((a, b) => String(a.nazwa).localeCompare(String(b.nazwa), "pl"));
+  return { lista: L, zmiany };
+}
