@@ -282,7 +282,9 @@ async function wczytajEksportPlik(f) {
     genStary = clone(G);
     const nowy = { kod: w.kod, plik: w.plik, ostatnie: "", wiersze: w.wiersze };
     await zapiszGenerator(nowy, [{ p: "wczytano eksport", a: "", b: `${w.plik} – ${w.wiersze.length} poz.` }], "wczytanie eksportu");
+    const doBazy = await dopiszDoBazy(w.wiersze.filter(p => p.cz > 0).map(p => ({ symbol: p.symbol, nazwa: p.nazwa, cena: p.cz, jm: p.jm, zrodlo: "zakup", data: today() })));
     okno(`<h3>Eksport wczytany</h3><p>Wczytano pozycji: <b>${w.wiersze.length}</b><br>Do zapytania (brak na magazynie): <b>${w.ileTak}</b></p>
+      ${doBazy ? `<p>Nowe pozycje dopisane do bazy cen: <b>${doBazy}</b> (z ceną zakupu z eksportu).</p>` : ""}
       <p>Sprawdź kolumny ZAPYTAĆ? i ILOŚĆ DO ZAPYTANIA, potem kliknij „2. Utwórz zapytanie”.</p>
       ${w.bezCeny ? `<p class="notice">Uwaga: w eksporcie nie ma kolumny z ceną zakupu – koszt projektu nie policzy materiału z magazynu (brak kolumny „Cena netto”).</p>` : ""}`);
   } catch (x) { console.error(x); okno(`<h3>Błąd</h3><p>Nie udało się wczytać pliku: ${esc(x.message || x)}</p>`); }
@@ -341,7 +343,7 @@ async function wybierzZListy() {
     const f = L.LC(q).split(/\s+/).filter(Boolean);
     const pasuje = lista.filter(d => f.every(t => L.LC(d.nazwa + " " + d.symbol).includes(t)));
     return pasuje.slice(0, 120).map(d => { const w = wyb.get(d._id), c = d.historia?.at(-1)?.c;
-      return `<tr data-id="${esc(d._id)}"><td><input type="checkbox" ${w ? "checked" : ""} aria-label="wybierz"></td><td>${esc(d.nazwa)}<div class="small mono">${esc(d.symbol)}${c ? ` · ${fmt(c, 2)} zł/${esc(d.jm || "?")}` : ""}</div></td>
+      return `<tr data-id="${esc(d._id)}"><td><input type="checkbox" ${w ? "checked" : ""} aria-label="wybierz"></td><td>${esc(d.nazwa)}<div class="small mono">${esc(d.symbol)}${c ? ` · ${fmt(c, 2)} zł/${esc(d.jm || "?")}` : ""}${d.zrodlo === "zamowienie" ? " · z zamówienia" : d.zrodlo === "zakup" ? " · z eksportu" : ""}</div></td>
         <td style="width:90px"><input data-il inputmode="decimal" value="${esc(w ? L.ogolny(w.ilosc) : "")}" placeholder="ilość"></td>
         <td style="width:96px"><select data-jm>${JEDN.map(j => `<option ${(w ? w.jm : jmDom(d)) === j ? "selected" : ""}>${j}</option>`).join("")}</select></td></tr>`; }).join("")
       + (pasuje.length > 120 ? `<tr><td colspan="4" class="small">… i ${pasuje.length - 120} więcej – zawęź wyszukiwanie</td></tr>` : "")
@@ -628,7 +630,12 @@ document.addEventListener("click", async e => {
       [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Zapisz", cls: "primary" }]);
     if (r.v !== "ok") return;
     Object.assign(z, { nr: r.form.nr.value.trim(), data: r.form.data.value, dostawa: r.form.dostawa.value, uwagi: r.form.uwagi.value.trim(), status: z.status === "dostarczono" ? "dostarczono" : "zamowiono" });
-    E.zamowienia[k] = z; zmiana(); rysujZamowienia(); return;
+    E.zamowienia[k] = z; zmiana(); rysujZamowienia();
+    // pozycje zamówione u tego dostawcy, których nie ma w bazie cen – dopisują się z ceną z zamówienia
+    const doBazy = await dopiszDoBazy(g.pozycje.map(({ w }) => { const pk = ZM.pozycjaDoKursu(w.a), n = L.naLiczbe(w.c?.[g.c]?.v);
+      return { symbol: "", nazwa: pk.nazwa, cena: n.ok ? n.w : 0, jm: pk.jm, zrodlo: "zamowienie", data: z.data || today(), dostawca: z.dostawca, zapytanie: E.nazwa }; }));
+    if (doBazy) toast(`Dopisano do bazy cen: ${doBazy} poz.`);
+    return;
   }
   if (a === "dost") { z.status = "dostarczono"; E.zamowienia[k] = z; zmiana(); rysujZamowienia(); return; }
   if (a === "cofnij") { if (!(await pytanie("Wyczyścić zamówienie?", `${esc(z.dostawca)}${z.kursId ? "<br>Dostawa w Logistyce zostaje – usuń ją tam, jeśli trzeba." : ""}`, "Wyczyść"))) return; delete E.zamowienia[k]; zmiana(); rysujZamowienia(); return; }
@@ -1198,6 +1205,16 @@ function cenySprawdz(spr) {
     catch (x) { failed(x); }
   };
 }
+// nowe pozycje (eksport z Subiekta, zamówienie) do bazy cen – tylko te, których jeszcze nie ma; zwraca liczbę dopisanych
+async function dopiszDoBazy(pozycje) {
+  if (!pozycje.length) return 0;
+  try {
+    startCeny(); if (!(await czekajNa(() => cenyZal, 8000))) return 0;
+    const { dokumenty } = CE.noweDoBazy(pozycje, CEN, ctxCen());
+    for (let i = 0; i < dokumenty.length; i += 450) await B.batch(dokumenty.slice(i, i + 450).map(x => ({ c: C.c, id: x.id, d: czysc(x.d) })));
+    return dokumenty.length;
+  } catch (x) { console.warn(x); return 0; }
+}
 async function wgrajListeCen(f) {
   let r;
   try {
@@ -1219,7 +1236,7 @@ async function wgrajListeCen(f) {
     if (!zmCeny && st.nazwa === p.nazwa && st.jm === jm && (st.status || "") === status) { bez++; continue; }
     if (zmCeny) zmiany++;
     const h = [...(st.historia || [])]; if (zmCeny) { if (ost && ost.d === dzis) h[h.length - 1] = { d: dzis, c: p.cena }; else h.push({ d: dzis, c: p.cena }); }
-    const { _id, ...reszta } = st;
+    const { _id, zrodlo, ...reszta } = st;
     ops.push({ c: C.c, id, d: czysc({ ...reszta, nazwa: p.nazwa, jm, skad: st.jmRecznie ? st.skad : p.skad, powod: p.powod, status, historia: h }) });
   }
   // pozycje wcześniej zapisane, a teraz wykluczone (KT, wypałki, wózki) – wyłączone z zestawień

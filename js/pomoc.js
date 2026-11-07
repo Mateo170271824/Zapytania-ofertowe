@@ -43,6 +43,7 @@ export const POMOC = {
     t: "Ceny materiałów",
     h: `<ul>
       <li><b>Wgraj listę</b> – lista „Surowiec” z Subiekta (Symbol, Rodzaj, Nazwa, Cena). Nowe pozycje dopisują się same, zmienione ceny trafiają do historii.</li>
+      <li>Nowe pozycje dopisują się do bazy też same: z eksportu w Generatorze (z ceną zakupu) i przy zamówieniu w zapytaniu (z ceną zamówioną) – także wpisane ręcznie profile, IPE itd.</li>
       <li>Pomijane: rodzaj KT, wypałki, wózki podwieszane, powtórzone nazwy. Pręty zawsze za kg.</li>
       <li>Ceny pokazane w zł/kg, zł/mb i zł/szt. Gdy aplikacja nie jest pewna jednostki, pozycja trafia do <b>Do sprawdzenia</b> – wybierz jednostkę albo pomiń.</li>
       <li><b>Zestawienie roczne</b> – jak zmieniały się ceny w kolejnych miesiącach.</li>

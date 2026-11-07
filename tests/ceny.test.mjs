@@ -33,3 +33,24 @@ test("wykluczenia: wypałki, wózki, rodzaj KT", () => {
   assert.ok(CE.WYKLUCZ_NAZWA.test("WÓZEK PODWIESZANY"));
   assert.ok(CE.WYKLUCZ_RODZAJ.includes("KT"));
 });
+
+test("nowe pozycje do bazy: z eksportu i z zamówienia, bez duplikatów", () => {
+  const istn = [{ _id: "T-1", nazwa: "Profil 100x100x4 S235 6m" }];
+  const { dokumenty } = CE.noweDoBazy([
+    { symbol: "T-1", nazwa: "Profil 100x100x4 S235 6m", cena: 351, jm: "szt", zrodlo: "zakup", data: "2026-11-07" },           // już jest
+    { symbol: "T-2", nazwa: "Profil 100x100x4 S355 6m", cena: 360, jm: "szt", zrodlo: "zakup", data: "2026-11-07" },           // nowy z eksportu
+    { symbol: "", nazwa: "Profil 100x100x4 S355 12m", cena: 60, jm: "szt", zrodlo: "zamowienie", data: "2026-11-07", dostawca: "Stal-Pol", zapytanie: "5-2026" },
+    { symbol: "", nazwa: "Obejma rurowa 42,4", cena: 4.5, jm: "szt", zrodlo: "zamowienie", data: "2026-11-07", dostawca: "Stal-Pol" },
+    { symbol: "", nazwa: "Wypałka 10mm", cena: 9, jm: "szt", zrodlo: "zamowienie", data: "2026-11-07" },                       // wykluczona
+    { symbol: "", nazwa: "Obejma rurowa 42,4", cena: 4.6, jm: "szt", zrodlo: "zamowienie", data: "2026-11-07" },               // drugi raz w tej samej paczce
+  ], istn, ctx);
+  assert.deepEqual(dokumenty.map(x => [x.id, x.d.jm, x.d.historia[0].c]), [
+    ["T-2", "szt", 360], ["N-profil-100x100x4-s355-12m", "mb", 60], ["N-obejma-rurowa-42-4", "szt", 4.5]]);
+  assert.equal(dokumenty[1].d.zrodlo, "zamowienie"); assert.equal(dokumenty[1].d.historia[0].dost, "Stal-Pol");
+});
+
+test("pozycje dopisane z eksportu/zamówienia nie dublują cen w zestawieniu", () => {
+  const lista = [{ symbol: "T-2", nazwa: "Profil 100x100x4 S355 6m", jm: "szt", zrodlo: "zakup", historia: [{ d: "2026-11-07", c: 360 }] }];
+  assert.equal(CE.zbierzCeny({ lista }, ctx).length, 0);
+  assert.equal(CE.zbierzCeny({ lista: [{ ...lista[0], zrodlo: undefined }] }, ctx).length, 1);
+});

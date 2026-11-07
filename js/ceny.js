@@ -165,8 +165,9 @@ export function zbierzCeny({ lista = [], projekty = [], zapytania = [] }, ctx) {
     punkty.push({ wyrob: w.klucz, opis: w.opis, grupa: w.grupa, typ: w.typ, gat: w.gat, nazwa, cena, jm, ...r, dl: m.dl, blacha: m.blacha, ...info });
   };
   // 1) lista z Subiekta (zap_ceny): historia cen ewidencyjnych
+  //    (pozycje dopisane z eksportu albo z zamówienia mają już swoje ceny w punktach 2 i 3 – bez dublowania)
   for (const d of lista) {
-    if (d.status === "pomin") continue;
+    if (d.status === "pomin" || d.zrodlo) continue;
     for (const h of d.historia || []) dodaj(d.nazwa, h.c, d.jm, { zrodlo: "lista", data: h.d, szac: false, symbol: d.symbol, dostawca: "" });
   }
   // 2) eksporty z Subiekta zapisane w projektach: cena ostatniego zakupu (Cena netto) z jednostką
@@ -226,4 +227,33 @@ export function zestawienieRoku(punkty, rok, po = "wyrob", miara = "zlKg") {
   }
   return [...wg.values()].map(r => ({ nazwa: r.nazwa, mies: r.mies.map(a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null), ile: r.mies.reduce((s, a) => s + a.length, 0) }))
     .sort((a, b) => a.nazwa.localeCompare(b.nazwa, "pl", { numeric: true }));
+}
+
+// ---------------------------------------------------------------- nowe pozycje do bazy (bez listy z Subiekta)
+/* pozycje: [{ symbol, nazwa, cena, jm, zrodlo: "zakup" | "zamowienie", data, dostawca, zapytanie }]
+   istniejace: dokumenty zap_ceny ({_id, nazwa}) -> { dokumenty: [{id, d}], pominiete } – tylko pozycje, których w bazie jeszcze nie ma */
+export const idPozycji = (symbol, nazwa) => String(symbol || "").replace(/\//g, "-").trim() || "N-" + L.LC(nazwa).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
+export function noweDoBazy(pozycje, istniejace, ctx) {
+  const ids = new Set(istniejace.map(d => d._id)), nazwy = new Set(istniejace.map(d => L.LC(L.vbaTrim(d.nazwa || ""))));
+  const dokumenty = []; let pominiete = 0;
+  for (const p of pozycje) {
+    const nazwa = L.wsTrim(p.nazwa || ""), id = idPozycji(p.symbol, nazwa), cena = +p.cena;
+    if (!nazwa || !(cena > 0) || WYKLUCZ_NAZWA.test(L.UC(nazwa))) { pominiete++; continue; }
+    if (ids.has(id) || nazwy.has(L.LC(nazwa))) continue;
+    let jm, status = "";
+    if (p.zrodlo === "zakup") { jm = jednostkaCeny(nazwa, cena, ctx, p.jm).jm; if (!jm) { jm = L.LC(p.jm || "").replace(/\.$/, "") || "szt"; status = "sprawdz"; } }
+    else {
+      const typ = L.typWyrobu(L.UC(nazwa));
+      if (!typ || !wyrob(nazwa)) jm = L.LC(p.jm || "") || "szt";               // obejmy, śruby… – cena za jednostkę z zapytania
+      else {
+        jm = L.cenaZaMb(typ) ? "mb" : "kg";
+        const m = miaryZNazwy(nazwa, ctx), r = przelicz(cena, jm, m);
+        if (r.zlKg !== null && !rozsadne(r.zlKg)) { const inna = jm === "mb" ? "kg" : "mb", r2 = przelicz(cena, inna, m); if (r2.zlKg !== null && rozsadne(r2.zlKg)) jm = inna; else status = "sprawdz"; }
+      }
+    }
+    const skad = p.zrodlo === "zakup" ? "eksport z Subiekta (cena zakupu)" : `zamówienie ${p.zapytanie || ""} – ${p.dostawca || ""}`.trim();
+    ids.add(id); nazwy.add(L.LC(nazwa));
+    dokumenty.push({ id, d: { symbol: p.symbol || "", nazwa, jm, skad, zrodlo: p.zrodlo, status, historia: [{ d: p.data, c: cena, ...(p.dostawca ? { dost: p.dostawca } : {}) }] } });
+  }
+  return { dokumenty, pominiete };
 }

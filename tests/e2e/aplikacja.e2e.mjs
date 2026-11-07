@@ -79,6 +79,7 @@ try {
   await p.click("#tabs [data-v=generator]"); await W(400);
   await p.setInputFiles("#gFile", plikEksportu); await p.waitForSelector("#dlg[open]");
   ok("eksport wczytany: 2 pozycje do zapytania", (await txt(p, "#dlg")).includes("Do zapytania (brak na magazynie): 2"), (await txt(p, "#dlg")).replace(/\n/g, " ").slice(0, 100));
+  ok("eksport: nowe pozycje z ceną zakupu w bazie", (await txt(p, "#dlg")).includes("Nowe pozycje dopisane do bazy cen: 3") && await ile("zap_ceny") === 3);
   await dlgOk(p); await W(500);
   await p.click("#gDopisz"); await p.waitForSelector("#wlN");
   await p.fill("#wlN", "Kątownik 50x50x5 S235 6m"); await p.fill("#wlI", "3"); await p.keyboard.press("Enter"); await W(200);
@@ -96,10 +97,10 @@ try {
   await p.click('#aGrid input[data-r="1"][data-c="2"]'); await p.keyboard.type("Stal-Pol"); await p.keyboard.press("Enter");
   await p.keyboard.type("58"); await p.keyboard.press("Enter"); await p.keyboard.type("=2,5*2"); await p.keyboard.press("Enter");
   await p.click('#aGrid input[data-r="1"][data-c="3"]'); await p.keyboard.type("Hurt Metal"); await p.keyboard.press("Enter");
-  await p.keyboard.type("55,5"); await p.keyboard.press("Enter"); await p.keyboard.type("4,8"); await p.keyboard.press("Enter"); await W(1500);
+  await p.keyboard.type("55,5"); await p.keyboard.press("Enter"); await p.keyboard.type("4,8"); await p.keyboard.press("Enter"); await p.keyboard.type("4,9"); await p.keyboard.press("Enter"); await W(1500);
   const b3 = await p.$eval('#aGrid input[data-r="3"][data-c="2"]', e => e.value.replace(/ /g, " "));
   ok("formuła =2,5*2 → 5,00 zł", b3 === "5,00 zł", b3);
-  await p.click("#aWybor"); await p.click('#aGrid td[data-r="2"][data-c="3"]'); await p.click('#aGrid td[data-r="3"][data-c="3"]'); await W(300); await p.click("#aWybor"); await W(1800);
+  await p.click("#aWybor"); await p.click('#aGrid td[data-r="2"][data-c="3"]'); await p.click('#aGrid td[data-r="3"][data-c="3"]'); await p.click('#aGrid td[data-r="4"][data-c="3"]'); await W(300); await p.click("#aWybor"); await W(1800);
   ok("historia arkusza", (await txt(p, "#aLog")).includes("wybór dostawcy"));
   // 3. zamówienie i dostawa w Logistyce
   const karta = "#aZam .sup-z";
@@ -108,11 +109,14 @@ try {
   await p.click(karta + ' [data-za="zam"]'); await p.waitForSelector("#dlg[open]");
   await p.fill('#dlg input[name="nr"]', "ZD 7/" + rok); await p.fill('#dlg input[name="dostawa"]', `${rok}-12-01`); await dlgOk(p); await W(2000);
   ok("zamówiono", (await txt(p, karta)).includes("ZD 7/" + rok));
+  await W(1500);
+  await baza(async db => { const d = (await getDocs(collection(db, "zap_ceny"))).docs.map(x => x.data()).find(x => x.nazwa === "Kątownik 50x50x5 S235 6m");
+    ok("zamówienie: nowa pozycja w bazie z ceną", d && d.historia?.[0]?.c === 4.9 && d.zrodlo === "zamowienie", JSON.stringify(d && { jm: d.jm, c: d.historia[0].c, skad: d.skad })); });
   ok("stan zamówienia nad dostawcą", (await txt(p, "#aGrid tr.r1")).includes("zam. ZD 7/" + rok));
   await zrzut(p, "arkusz");
   await p.click(karta + ' [data-za="kurs"]'); await p.waitForSelector("#dlg[open]"); await dlgOk(p); await W(2500);
   await baza(async db => { const s = await getDocs(collection(db, "kursy")); const d = s.docs[0]?.data() || {};
-    ok("dostawa w Logistyce (do uzupełnienia)", s.size === 1 && d.doUzup === true && d.kontr === "Hurt Metal" && d.pozycje?.length === 2, JSON.stringify({ kontr: d.kontr, poz: d.pozycje?.length, waga: d.waga })); });
+    ok("dostawa w Logistyce (do uzupełnienia)", s.size === 1 && d.doUzup === true && d.kontr === "Hurt Metal" && d.pozycje?.length === 3, JSON.stringify({ kontr: d.kontr, poz: d.pozycje?.length, waga: d.waga })); });
   // 4. zapytanie na magazyn z ręczną pozycją
   await p.click("#tabs [data-v=zapytania]"); await W(400);
   await p.click("#lMag"); await p.waitForSelector("#wlN");
