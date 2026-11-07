@@ -1,15 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#366092"/>
-  <rect x="96" y="112" width="320" height="288" rx="18" fill="#ffffff"/>
-  <rect x="96" y="112" width="320" height="56" rx="18" fill="#dde7f3"/>
-  <rect x="96" y="150" width="320" height="18" fill="#dde7f3"/>
-  <line x1="210" y1="112" x2="210" y2="400" stroke="#9fb3cc" stroke-width="8"/>
-  <line x1="313" y1="112" x2="313" y2="400" stroke="#9fb3cc" stroke-width="8"/>
-  <line x1="96" y1="240" x2="416" y2="240" stroke="#9fb3cc" stroke-width="8"/>
-  <line x1="96" y1="320" x2="416" y2="320" stroke="#9fb3cc" stroke-width="8"/>
-  <rect x="214" y="172" width="95" height="64" fill="#c6efce"/>
-  <rect x="317" y="252" width="95" height="64" fill="#c6efce"/>
-  <rect x="317" y="172" width="95" height="64" fill="#ffc7ce"/>
-  <rect x="100" y="172" width="106" height="64" fill="#00b0f0"/>
-  <rect x="100" y="252" width="106" height="64" fill="#ffff00"/>
+  <!-- znak systemu SteelFlow (dwuteownik + przepływ) na kafelku w kolorze modułu -->
+  <rect width="512" height="512" rx="104" fill="#366092"/>
+  <path fill="#ffffff" d="M150 112h212v42h-82v204h82v42H150v-42h82V154h-82z"/>
+  <path d="M78 352C168 352 196 256 256 256S344 166 404 166" fill="none" stroke="#366092" stroke-width="54" stroke-linecap="round"/>
+  <path d="M78 352C168 352 196 256 256 256S344 166 404 166" fill="none" stroke="#f2b705" stroke-width="30" stroke-linecap="round"/>
+  <path d="M396 126l64 40-64 40z" fill="#f2b705" stroke="#366092" stroke-width="10" stroke-linejoin="round" paint-order="stroke"/>
 </svg>
