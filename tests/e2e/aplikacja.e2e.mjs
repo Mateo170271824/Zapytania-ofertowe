@@ -92,6 +92,9 @@ try {
   ok("dopisano ręcznie do wczytanej listy", (await txt(p, "#widok")).includes("Kątownik 50x50x5 S235 6m"));
   await p.click("#gUtworz"); await p.waitForSelector("#dlg[open]");
   ok("zapytanie utworzone", (await txt(p, "#dlg")).includes(`1-${rok}`));
+  await W(800);
+  await baza(async db => { const d = (await getDoc(doc(db, "projekty/TESTKL"))).data();
+    ok("kod klienta we wspólnym słowniku projektów", d && d.kod === "TESTKL" && d.zrodla?.zap === true, JSON.stringify(d)); });
   await dlgOk(p, "tak"); await p.waitForSelector("#dlg[open]"); await W(200);
   const mail = await txt(p, "#dlg");
   ok("mail: temat, pozycje, adresy", mail.includes(`Zapytanie ofertowe 1/${rok}`) && mail.includes("Profil 120x80x3 S355 6m- 4 szt") && mail.includes("Obejma rurowa 42,4- 10 szt") && mail.includes("Kątownik 50x50x5 S235 6m- 3 szt") && mail.includes("hurtmetal.example"));

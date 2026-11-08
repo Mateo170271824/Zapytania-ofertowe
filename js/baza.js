@@ -32,7 +32,7 @@ export async function firebase() {
     watchDoc: (c, id, cb, err) => F.onSnapshot(F.doc(db, c, id), s => cb(s.exists() ? s.data() : null), err),
     accounts: async () => (await F.getDocs(F.query(F.collection(db, "uzytkownicy"), F.where("rola", "==", "biuro")))).docs.map(d => ({ uid: d.id, ...d.data() })),
     tx: fn => F.runTransaction(db, T => fn(wrapT(T))),
-    batch: async ops => { const b = F.writeBatch(db); for (const o of ops) { const r = F.doc(db, o.c, o.id); if (o.del) b.delete(r); else if (o.upd) b.update(r, o.d); else b.set(r, o.d); } await b.commit(); },
+    batch: async ops => { const b = F.writeBatch(db); for (const o of ops) { const r = F.doc(db, o.c, o.id); if (o.del) b.delete(r); else if (o.upd) b.update(r, o.d); else b.set(r, o.d, o.merge ? { merge: true } : {}); } await b.commit(); },
     get: async (c, id) => { const s = await F.getDoc(F.doc(db, c, id)); return s.exists() ? s.data() : null; },
     // kartoteka dostawców Truck App (ustawienia/glowne.dostawcy) – zmiana tylko pola dostawcy, w transakcji
     zmienDostawcowTruck: fn => F.runTransaction(db, async T => { const r = F.doc(db, "ustawienia", "glowne"); const s = await T.get(r); if (!s.exists()) return 0;
