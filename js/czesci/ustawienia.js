@@ -18,12 +18,11 @@ export function renderUstawienia() {
   const pole = (k, l, opis, typ = "text") => `<label>${l}<input data-u="${k}" value="${esc(UE[k] ?? "")}" ${typ === "tn" ? 'list="tnList"' : ""}><span class="small">${opis}</span></label>`;
   const wagiF = WE.rows.map((r, i) => [r, i]).filter(([r]) => !wagiQ || L.LC(`${r.t} ${r.w} ${r.o} ${r.u}`).includes(L.LC(wagiQ)));
   M().innerHTML = `
-  ${natywna() ? "" : `<div class="panel"><div class="hd"><div><h3>Aplikacja na telefon i komputer</h3><span class="small">Dwie wersje do wyboru – obie otwierają zawsze aktualne Zapytania, nie trzeba ich aktualizować.</span></div></div>
-    <div class="bd"><div class="toolbar"><button class="btn primary" id="pwaInst" ${globalThis.zapInstalacja ? "" : "hidden"}>Zainstaluj z przeglądarki</button>
-      <a class="btn" href="https://github.com/Mateo170271824/Zapytania-ofertowe/releases/download/android/Zapytania-ofertowe.apk">Pobierz APK (Android)</a></div>
+  ${natywna() ? "" : `<div class="panel"><div class="hd"><div><h3>Aplikacja na telefon i komputer</h3><span class="small">Ikona Zapytań na telefonie albo komputerze – otwiera zawsze aktualną wersję (część SteelFlow).</span></div></div>
+    <div class="bd"><div class="toolbar"><button class="btn primary" id="pwaInst" ${globalThis.zapInstalacja ? "" : "hidden"}>Zainstaluj z przeglądarki</button></div>
       <ul class="small" style="margin:8px 0 0;padding-left:18px">
-        <li><b>Z przeglądarki (jak Kooperacje)</b>: Chrome → menu ⋮ → „Zainstaluj aplikację” (albo „Dodaj do ekranu głównego”). Na komputerze: ikona instalacji na końcu paska adresu. iPhone: Safari → Udostępnij → „Do ekranu początkowego”.</li>
-        <li><b>APK (jak Kalkulator stali)</b>: pobierz plik na telefonie i otwórz – Android zapyta o zgodę na instalację z tego źródła. Pliki (PDF, Excel) zapisujesz przez okno „Udostępnij”.</li>
+        <li><b>Android i komputer</b>: Chrome → menu ⋮ → „Zainstaluj aplikację” (albo „Dodaj do ekranu głównego”). Na komputerze: ikona instalacji na końcu paska adresu.</li>
+        <li><b>iPhone</b>: Safari → Udostępnij → „Do ekranu początkowego”.</li>
       </ul></div></div>`}
   <div class="panel"><div class="hd"><div><h3>Wygląd</h3><span class="small">Kolorystyka aplikacji na tym urządzeniu. Ciemny tryb dopasowuje się do ustawień systemu.</span></div></div>
     <div class="bd motywy" id="uMotyw">${MOTYWY.map(([k, n, th, ak]) => `<button class="motyw" data-m="${k}" aria-pressed="${motyw() === k}"><span class="prev"><span style="background:${th}"></span><span style="background:${ak}"></span><span style="background:#c6efce"></span></span><b>${n}</b></button>`).join("")}</div></div>

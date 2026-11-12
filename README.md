@@ -16,8 +16,8 @@ Aplikacja zastępująca plik „Zapytania Lista 2026.xlsm”. Logika jest przeni
 
 | Gdzie | Jak |
 |---|---|
-| **Android (APK)** | [Zapytania-ofertowe.apk](https://github.com/Mateo170271824/Zapytania-ofertowe/releases/download/android/Zapytania-ofertowe.apk) – pobierz na telefonie i otwórz (też: Ustawienia → Aplikacja na telefon) |
-| **iPhone / przeglądarka** | https://mateo170271824.github.io/Zapytania-ofertowe/ → Udostępnij → „Do ekranu początkowego” |
+| **Aplikacja (SteelFlow)** | **https://steel-flow.web.app/zapytania/** – w Chrome „Zainstaluj” dodaje ikonę Zapytań. Stary adres GitHub Pages tylko przekierowuje. |
+| **iPhone** | https://steel-flow.web.app/zapytania/ → Udostępnij → „Do ekranu początkowego” |
 
 APK (Capacitor, jak Kalkulator stali) otwiera aktualną stronę aplikacji, więc zmiany w Zapytaniach są od razu w telefonie – nowe APK potrzebne jest tylko przy zmianach w `android/`. Pliki (PDF, Excel, kopia) w APK zapisuje się przez okno „Udostępnij”.
 

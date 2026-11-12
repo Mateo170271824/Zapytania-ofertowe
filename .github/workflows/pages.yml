@@ -51,17 +51,9 @@ jobs:
       # gdy testy nie przejdą, strona się nie zmienia
       - name: Testy
         run: npm test
-      - name: Pliki strony
-        run: |
-          mkdir www
-          cp -r index.html manifest.webmanifest icon.svg icons sw.js css js img vendor www/
-          # każda publikacja ma własną wersję plików (?v=…), żeby przeglądarka nie trzymała starych
-          V="${GITHUB_SHA::10}"
-          # wszystkie pliki, także w podkatalogach (js/czesci/) – inaczej przeglądarka wczyta app.js dwa razy
-          find www -name '*.js' -path 'www/js/*' -exec sed -i -E "s/\?v=[0-9A-Za-z]+/?v=$V/g" {} +
-          sed -i -E "s/\?v=[0-9A-Za-z]+/?v=$V/g" www/index.html
-          if grep -rhoE "\?v=[0-9A-Za-z]+" www/index.html www/js | grep -v "?v=$V" | grep -q .; then echo "::error::Zostały pliki ze starą wersją ?v="; grep -rnE "\?v=[0-9A-Za-z]+" www/index.html www/js | grep -v "?v=$V"; exit 1; fi
-          grep -c "?v=$V" www/index.html www/js/app.js
+      # Zapytania działają w SteelFlow (steel-flow.web.app/zapytania/) – tu tylko przekierowanie ze starego adresu
+      - name: Strona przekierowania
+        run: mkdir www && cp przekierowanie/index.html przekierowanie/404.html przekierowanie/sw.js www/
       - uses: actions/configure-pages@v5
         with:
           enablement: true
@@ -70,3 +62,21 @@ jobs:
           path: www
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # nowa wersja Zapytań od razu w SteelFlow (bez sekretu: przy sprawdzeniu co 2 godziny)
+  steelflow:
+    needs: testy
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      HAS_ZAPIS: ${{ secrets.STEELFLOW_ZAPIS != '' }}
+    steps:
+      - name: Odświeżenie SteelFlow
+        env:
+          T: ${{ secrets.STEELFLOW_ZAPIS }}
+        run: |
+          if [ "$HAS_ZAPIS" != "true" ]; then echo "::notice::Brak sekretu STEELFLOW_ZAPIS – SteelFlow pobierze nową wersję Zapytań przy sprawdzeniu co 2 godziny."; exit 0; fi
+          k=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $T" -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/Mateo170271824/Logistyka/actions/workflows/steelflow.yml/dispatches -d '{"ref":"main"}')
+          if [ "$k" = "204" ]; then echo "Uruchomiono publikację SteelFlow."; else echo "::warning::Nie udało się uruchomić publikacji SteelFlow (HTTP $k)."; fi
+
