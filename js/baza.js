@@ -1,6 +1,6 @@
 /* Połączenie z bazą (Firebase: logowanie + Firestore). Ten sam projekt co Truck App, Kooperacje i Kombajn.
    Konfiguracja, zapis loginu i tryb emulatora (?emu na localhost) – wspólny moduł SteelFlow (js/steelflow-konto.js). */
-import { firebaseConfig, zaladujSDK, polacz, zaloguj, komunikat } from "./steelflow-konto.js?v=202611121000";
+import { firebaseConfig, zaladujSDK, polacz, zaloguj, komunikat } from "./steelflow-konto.js?v=202611121300";
 export { firebaseConfig, komunikat };
 export const C = { z: "zap_zapytania", p: "zap_projekty", log: "zap_dziennik", u: "zap_ustawienia", c: "zap_ceny" };
 export async function firebase() {

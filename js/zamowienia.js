@@ -1,7 +1,7 @@
 /* Zamówienia po wyborze dostawcy: wybrano → zamówiono (nr, data) → dostawa w Logistyce → dostarczono.
    Dane w dokumencie zapytania: zamowienia[kolor dostawcy] = { dostawca, nr, data, dostawa, kursId, status, uwagi }.
    Dostawa trafia do kolekcji „kursy” Logistyki tak samo jak z Kooperacji (doUzup + odZakupow → „🛒 do uzupełnienia”). */
-import * as L from "./logika.js?v=202611121000";
+import * as L from "./logika.js?v=202611121300";
 
 export const STATUSY = { wybrano: "wybrano", zamowiono: "zamówiono", dostawa: "dostawa w Logistyce", dostarczono: "dostarczono" };
 
