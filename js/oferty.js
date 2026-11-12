@@ -1,7 +1,7 @@
 /* Oferty z poczty: zapisany mail (.eml), PDF albo wklejony tekst → ceny w zapytaniu.
    Blacha trapezowa: wiersz zapytania „KOD BUDOWY | Blacha trapezowa T35 0,5 RAL 7016- 320 m2”, cena w zł/m².
    Bez zależności od przeglądarki (testy w Node). */
-import * as L from "./logika.js?v=202611121000";
+import * as L from "./logika.js?v=202611121300";
 
 // ---------------------------------------------------------------- wiersz blachy trapezowej
 export const SEP_KOD = " | ";
