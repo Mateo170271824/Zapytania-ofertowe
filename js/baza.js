@@ -1,23 +1,11 @@
-/* Połączenie z bazą (Firebase: logowanie + Firestore). Ten sam projekt co Logistyka, Truck App i Kooperacje.
-   Adres ?emu na localhost łączy z lokalnym emulatorem (testy). */
-export const firebaseConfig = {
-  apiKey: "AIzaSyB8Zi3CTsEJDqnxpt2EpmEN0JKbQZkx9Ik",
-  authDomain: "logistyka-app-41d7a.firebaseapp.com",
-  projectId: "logistyka-app-41d7a",
-  storageBucket: "logistyka-app-41d7a.firebasestorage.app",
-  messagingSenderId: "730726420764",
-  appId: "1:730726420764:web:fbd4a12acd2b5ebdb52ad9"
-};
+/* Połączenie z bazą (Firebase: logowanie + Firestore). Ten sam projekt co Truck App, Kooperacje i Kombajn.
+   Konfiguracja, zapis loginu i tryb emulatora (?emu na localhost) – wspólny moduł SteelFlow (js/steelflow-konto.js). */
+import { firebaseConfig, zaladujSDK, polacz, zaloguj, komunikat } from "./steelflow-konto.js?v=202611121000";
+export { firebaseConfig, komunikat };
 export const C = { z: "zap_zapytania", p: "zap_projekty", log: "zap_dziennik", u: "zap_ustawienia", c: "zap_ceny" };
 export async function firebase() {
-  const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-  const A = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
-  const F = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-  const app = initializeApp(firebaseConfig), auth = A.getAuth(app), db = F.getFirestore(app);
-  if (new URLSearchParams(location.search).has("emu") && ["localhost", "127.0.0.1"].includes(location.hostname)) {
-    A.connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true }); F.connectFirestoreEmulator(db, "127.0.0.1", 8085);
-  }
-  const normLogin = t => String(t || "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ł/g, "l").replace(/[^a-z0-9._-]+/g, ".").replace(/^\.+|\.+$/g, "");
+  const sdk = await zaladujSDK(), A = sdk.auth, F = sdk.firestore;
+  const { auth, db } = polacz(sdk, { emuPort: 8085 });
   const wrapT = T => ({
     get: async (c, id) => { const s = await T.get(F.doc(db, c, id)); return s.exists() ? s.data() : null; },
     set: (c, id, d) => T.set(F.doc(db, c, id), d),
@@ -26,7 +14,7 @@ export async function firebase() {
   });
   return {
     onAuth: cb => A.onAuthStateChanged(auth, cb),
-    login: (l, p) => A.signInWithEmailAndPassword(auth, normLogin(l) + "@konta." + firebaseConfig.authDomain, p),
+    login: (l, p) => zaloguj(sdk, auth, l, p),
     logout: () => A.signOut(auth),
     watch: (c, cb, err) => F.onSnapshot(c === C.log ? F.query(F.collection(db, c), F.orderBy("kiedy", "desc"), F.limit(1500)) : F.collection(db, c), s => cb(s.docs.map(d => ({ _id: d.id, ...d.data() }))), err),
     watchDoc: (c, id, cb, err) => F.onSnapshot(F.doc(db, c, id), s => cb(s.exists() ? s.data() : null), err),
