@@ -1,12 +1,13 @@
-import * as L from "./logika.js?v=202611061834";
-import * as I from "./import-excel.js?v=202611061834";
-import * as OF from "./oferty.js?v=202611061834";
-import * as KP from "./kopia.js?v=202611061834";
-import * as ZM from "./zamowienia.js?v=202611061834";
-import { $, esc, pad, iso, today, toD, fDT, fD, clone, uidS, fmt, zl, ogolnyLiczba, kolLit, hex, toast, failed, show, msg, okno, pytanie, kopiuj, pobierzPlik, czytajPlik, zapiszXlsx, natywna } from "./ui.js?v=202611061834";
-import { C, firebase } from "./baza.js?v=202611061834";
-import { trescPomocy, START_ZASTEPCY } from "./pomoc.js?v=202611061834";
-import * as CE from "./ceny.js?v=202611061834";
+import * as L from "./logika.js?v=202611121000";
+import * as I from "./import-excel.js?v=202611121000";
+import * as OF from "./oferty.js?v=202611121000";
+import * as KP from "./kopia.js?v=202611121000";
+import * as ZM from "./zamowienia.js?v=202611121000";
+import { $, esc, pad, iso, today, toD, fDT, fD, clone, uidS, fmt, zl, ogolnyLiczba, kolLit, hex, toast, failed, show, msg, okno, pytanie, kopiuj, pobierzPlik, czytajPlik, zapiszXlsx, natywna } from "./ui.js?v=202611121000";
+import { C, firebase } from "./baza.js?v=202611121000";
+import { zastStatus as zastS, zastDoDnia, komunikat } from "./steelflow-konto.js?v=202611121000";
+import { trescPomocy, START_ZASTEPCY } from "./pomoc.js?v=202611121000";
+import * as CE from "./ceny.js?v=202611121000";
 
 /* ============================================================ konfiguracja */
 const PALETA = ["00B0F0", "FFFF00", "92D050", "FFC000", "FF99FF", "B4A7D6", "F4B084", "9BC2E6", "C9C9C9", "FF7C80"];
@@ -22,8 +23,9 @@ let subs = [], started = false, user = null, metaOk = false, dostOk = false, met
 const widok = { nazwa: "generator", arg: "" };
 const odpowiedzi = {};          // odpowiedzi na pytania makra (długość, grubość) w tej sesji
 
-function zastStatus(z) { if (!z) return "brak"; if (z.odwolano) return "odwołane"; const n = Date.now(), od = toD(z.od)?.getTime(), d = toD(z.do)?.getTime(); return n < od ? "zaplanowane" : n >= d ? "zakończone" : "aktywne"; }
-const doDnia = z => iso(new Date(toD(z.do).getTime() - 864e5));
+// zastępstwa – wspólna logika SteelFlow (js/steelflow-konto.js)
+const zastStatus = z => zastS(z);
+const doDnia = zastDoDnia;
 const zapById = id => Z.find(z => z._id === id);
 const zapByNazwa = n => Z.find(z => L.LC(z.nazwa) === L.LC(n));
 const zapytaniaPosort = () => Z.slice().sort((a, b) => (b.kolejnosc ?? 0) - (a.kolejnosc ?? 0));
@@ -31,7 +33,7 @@ const zapytaniaPosort = () => Z.slice().sort((a, b) => (b.kolejnosc ?? 0) - (a.k
 /* ============================================================ logowanie i uprawnienia */
 $("loginF").addEventListener("submit", async e => {
   e.preventDefault(); $("lgErr").hidden = true;
-  try { await B.login($("lgLogin").value, $("lgPass").value); } catch { $("lgErr").hidden = false; $("lgErr").textContent = "Nieprawidłowy login lub hasło."; }
+  try { await B.login($("lgLogin").value, $("lgPass").value); } catch (x) { $("lgErr").hidden = false; $("lgErr").textContent = komunikat(x); }
 });
 $("btnOut").onclick = () => B.logout();
 $("btnPomoc").onclick = () => okno(trescPomocy(widok.nazwa, isOwner), [{ v: "ok", t: "Zamknij", cls: "primary" }], { szer: "min(720px, 96vw)" });
@@ -1260,7 +1262,7 @@ async function renderKoszt() {
     ${p.pozycje.map(x => `<tr><td>${esc(p.id)}</td><td>${esc(p.kod)}</td><td>${fD(p.data)}</td><td class="mono">${esc(x.symbol)}</td><td>${esc(x.nazwa)}</td><td>${esc(x.jm)}</td><td class="num">${L.ogolny(x.ilosc)}</td><td class="num">${L.ogolny(x.niez)}</td><td class="num">${L.ogolny(x.nazd)}</td><td class="num">${x.cz !== undefined ? L.ogolny(x.cz) : ""}</td><td>${esc(x.zapytano)}</td><td>${esc(x.ark)}</td><td>${esc(x.tresc)}</td></tr>`).join("")}</tbody></table></div></details>`;
   $("kEdytuj").onclick = () => edytujProjekt(p);
   $("kPdf").onclick = async () => {
-    try { const pdf = await import("./pdf.js?v=202611061834"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
+    try { const pdf = await import("./pdf.js?v=202611121000"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
     catch (x) { console.error(x); toast("Nie udało się zrobić PDF: " + (x.message || x)); }
   };
 }
