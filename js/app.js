@@ -497,6 +497,7 @@ function renderArkusz() {
         <button class="btn" id="aWaga">Waga dla logistyki</button>
         <button class="btn" id="aKoszt">Koszt projektu${proj ? "" : " (brak danych)"}</button>
         <button class="btn" id="aXls">Pobierz jako Excel</button>
+        <button class="btn" id="aKom" title="Pokaż treść komentarzy w komórkach">Pokaż komentarze</button>
         ${isOwner ? `<button class="btn danger" id="aUsun">Usuń</button>` : ""}
       </div></div>
       <div class="bd legend" id="aLegenda"></div>
@@ -512,6 +513,9 @@ function renderArkusz() {
   $("aWaga").onclick = async () => { await zapiszTeraz(); go("waga", eId); };
   $("aKoszt").onclick = async () => { await zapiszTeraz(); kosztDlaZapytania(zapById(eId)); };
   $("aXls").onclick = () => eksportArkusza(E);
+  const komOn = v => { $("aBox").classList.toggle("komentarze", v); $("aKom").classList.toggle("on", v); $("aKom").textContent = v ? "Ukryj komentarze" : "Pokaż komentarze"; try { localStorage.setItem("zap_kom", v ? "1" : ""); } catch {} };
+  let kom0 = false; try { kom0 = !!localStorage.getItem("zap_kom"); } catch {}
+  komOn(kom0); $("aKom").onclick = () => komOn(!$("aBox").classList.contains("komentarze"));
   $("aZListy").onclick = async () => {
     const wyb = await wybierzZListy(); if (!wyb) return;
     przytnij();
@@ -537,13 +541,18 @@ function wartWyswietl(c, kol) {
 }
 const wartEdycja = c => !c ? "" : c.f ? c.f : typeof c.v === "number" ? L.ogolny(c.v) : String(c.v ?? "");
 // pod nazwą dostawcy: ile pozycji wybrano i stan zamówienia (zamówiono / dostawa w Logistyce / dostarczono)
+// w oknach zamówienia Enter nie zatwierdza (w polach jednowierszowych nic nie robi, w uwagach – nowa linia); zapis tylko przyciskiem
+function bezEnterZapisu(f) { f.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.tagName === "INPUT") e.preventDefault(); }); }
 function stanDostawcy(c, n) {
-  const k = L.kolor(n.k); if (k === -1 || !L.vbaTrim(n.t || "")) return "";
+  if (!L.vbaTrim(n.t || "")) return "";
+  const k = L.kolor(n.k), btn = `<button type="button" class="kolBtn" data-kol="${c}" title="Kolor dostawcy – wybierz albo usuń" aria-label="kolor dostawcy" style="${k !== -1 ? `--k:${hex(k)}` : ""}"></button>`;
+  if (k === -1) return `<div class="zst">${btn}<span>bez koloru</span></div>`;
   const ile = E.wiersze.filter(w => L.vbaTrim(w.a) && (L.kolor(w.k) === k || L.kolor(w.c?.[c]?.k) === k)).length;
   const z = (E.zamowienia || {})[k] || {}, kurs = z.kursId ? kursySub.get(z.kursId)?.dane : null;
   const [kl, t] = (kurs?.status === "Dostarczone" || z.status === "dostarczono") ? ["p-ok", "dostarczono"] : z.kursId ? ["p-acc", "w Logistyce"] : z.status === "zamowiono" ? ["p-warn", z.nr ? "zam. " + z.nr : "zamówiono"] : ["p-idle", "nie zamówiono"];
-  return `<div class="zst"><span>${ile} poz.</span><span class="pill ${kl}">${esc(t)}</span></div>`;
+  return `<div class="zst">${btn}<span>${ile} poz.</span><span class="pill ${kl}">${esc(t)}</span></div>`;
 }
+const km = t => `<span class="km" title="${esc(t)}"></span><span class="kmT">${esc(t)}</span>`;
 let dodWiersze = 0;          // puste wiersze dołożone Enterem / strzałką na końcu arkusza
 function rysujArkusz() {
   const g = $("aGrid"); if (!g || !E) return;
@@ -555,21 +564,21 @@ function rysujArkusz() {
   const szerA = tel ? Math.round(Math.min(150, Math.max(118, innerWidth * 0.36))) : szerKol(Math.max(String(E.kod ?? "").length, ...E.wiersze.map(w => Math.max(...String(w.a ?? "").split("\n").map(l => l.length)))), 300, 560);
   let h = `<table class="ark ark2"><thead><tr><th class="rn"></th><th style="position:sticky;left:${tel ? 26 : 34}px;z-index:4;width:${szerA}px;min-width:${szerA}px">A</th>${Array.from({ length: ostK - 1 }, (_, i) => { const w = szer(i + 2); return `<th style="width:${w}px;min-width:${w}px" title="kolumna ${kolLit(i + 2)}">${kolLit(i + 2)}</th>`; }).join("")}<th></th></tr></thead><tbody>`;
   // wiersz 1: kod klienta + dostawcy
-  h += `<tr class="r1"><td class="rn" title="wiersz 1"></td><td class="a" data-r="1" data-c="1">${E.kodM ? '<span class="km" title="' + esc(E.kodM) + '"></span>' : ""}<input value="${esc(E.kod)}" data-r="1" data-c="1" aria-label="A1 kod klienta"></td>`;
+  h += `<tr class="r1"><td class="rn" title="wiersz 1"></td><td class="a" data-r="1" data-c="1">${E.kodM ? km(E.kodM) : ""}<input value="${esc(E.kod)}" data-r="1" data-c="1" aria-label="A1 kod klienta"></td>`;
   for (let c = 2; c <= ostK; c++) {
     const n = naglowki[c] || {}, k = L.kolor(n.k);
-    h += `<td class="c dost ${k !== -1 ? "kol" : ""}" data-r="1" data-c="${c}" style="${k !== -1 ? `--k:${hex(k)}` : ""}">${n.m ? `<span class="km" title="${esc(n.m)}"></span>` : ""}<input class="txt" value="${esc(n.t ?? "")}" data-r="1" data-c="${c}" list="dostList" aria-label="${kolLit(c)}1 dostawca" placeholder="dostawca">${stanDostawcy(c, n)}</td>`;
+    h += `<td class="c dost ${k !== -1 ? "kol" : ""}" data-r="1" data-c="${c}" style="${k !== -1 ? `--k:${hex(k)}` : ""}">${n.m ? km(n.m) : ""}<input class="txt" value="${esc(n.t ?? "")}" data-r="1" data-c="${c}" list="dostList" aria-label="${kolLit(c)}1 dostawca" placeholder="dostawca">${stanDostawcy(c, n)}</td>`;
   }
   h += `<td class="plus" rowspan="1"><button class="btn sm" id="aDodajKol" title="Dodaj kolumnę dostawcy">+</button></td></tr>`;
   for (let i = 0; i < nW; i++) {
     const w = E.wiersze[i] || { a: "", c: {} }, r = i + 2, kA = L.kolor(w.k);
     const skr = L.skrajneCeny(w, 30);
-    h += `<tr><td class="rn" title="wiersz ${r}">${L.vbaTrim(w.a) ? r - 1 : ""}</td><td class="a ${kA !== -1 ? "kol" : ""}" data-r="${r}" data-c="1" style="${kA !== -1 ? `--k:${hex(kA)}` : ""}">${w.m ? `<span class="km" title="${esc(w.m)}"></span>` : ""}<textarea rows="1" data-r="${r}" data-c="1" aria-label="A${r}">${esc(w.a)}</textarea></td>`;
+    h += `<tr><td class="rn" title="wiersz ${r}">${L.vbaTrim(w.a) ? r - 1 : ""}</td><td class="a ${kA !== -1 ? "kol" : ""}" data-r="${r}" data-c="1" style="${kA !== -1 ? `--k:${hex(kA)}` : ""}">${w.m ? km(w.m) : ""}<textarea rows="1" data-r="${r}" data-c="1" aria-label="A${r}">${esc(w.a)}</textarea></td>`;
     for (let c = 2; c <= ostK; c++) {
       const cel = w.c?.[c], kc = L.kolor(cel?.k), cls = skr.min.has(c) ? "min" : skr.max.has(c) ? "max" : "";
       const kw = kc !== -1 ? kc : (kA !== -1 && L.kolor(naglowki[c]?.k) === kA ? kA : -1);     // cena wybranego dostawcy w tym wierszu
       const txt = cel && typeof cel.v !== "number" && !cel.f;
-      h += `<td class="c ${cls} ${kc !== -1 && !cls ? "kol" : ""} ${kw !== -1 ? "wyb" : ""}" data-r="${r}" data-c="${c}" style="${kw !== -1 ? `--k:${hex(kw)}` : ""}">${cel?.m ? `<span class="km" title="${esc(cel.m)}"></span>` : ""}<input class="${txt ? "txt" : ""}" value="${esc(wartWyswietl(cel, c))}" data-r="${r}" data-c="${c}" inputmode="decimal" aria-label="${kolLit(c)}${r}"></td>`;
+      h += `<td class="c ${cls} ${kc !== -1 && !cls ? "kol" : ""} ${kw !== -1 ? "wyb" : ""}" data-r="${r}" data-c="${c}" style="${kw !== -1 ? `--k:${hex(kw)}` : ""}">${cel?.m ? km(cel.m) : ""}<input class="${txt ? "txt" : ""}" value="${esc(wartWyswietl(cel, c))}" data-r="${r}" data-c="${c}" inputmode="decimal" aria-label="${kolLit(c)}${r}"></td>`;
     }
     h += `<td></td></tr>`;
   }
@@ -633,8 +642,9 @@ document.addEventListener("click", async e => {
   E.zamowienia = E.zamowienia || {};
   const z = E.zamowienia[k] || { dostawca: ZM.pelnaNazwa(g.dostawca, U) };
   if (a === "zam") {
-    const r = await okno(`<h3>Zamówienie: ${esc(z.dostawca)}</h3><div class="grid3"><label>Nr zamówienia (np. ZD)<input name="nr" value="${esc(z.nr || "")}"></label><label>Data zamówienia<input name="data" type="date" value="${esc(z.data || today())}"></label><label>Planowana dostawa<input name="dostawa" type="date" value="${esc(z.dostawa || "")}"></label><label class="full">Uwagi<input name="uwagi" value="${esc(z.uwagi || "")}"></label></div>`,
-      [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Zapisz", cls: "primary" }]);
+    const r = await okno(`<h3>Zamówienie: ${esc(z.dostawca)}</h3><div class="grid3"><label>Nr zamówienia (np. ZD)<input name="nr" value="${esc(z.nr || "")}"></label><label>Data zamówienia<input name="data" type="date" value="${esc(z.data || today())}"></label><label>Planowana dostawa<input name="dostawa" type="date" value="${esc(z.dostawa || "")}"></label><label class="full">Uwagi / opis zamówienia<textarea name="uwagi" rows="4" placeholder="Enter – nowa linia">${esc(z.uwagi || "")}</textarea></label></div>
+      <p class="small">Zamówienie zapisuje się przyciskiem „Zapisz”.</p>`,
+      [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Zapisz", cls: "primary" }], { poOtwarciu: bezEnterZapisu });
     if (r.v !== "ok") return;
     Object.assign(z, { nr: r.form.nr.value.trim(), data: r.form.data.value, dostawa: r.form.dostawa.value, uwagi: r.form.uwagi.value.trim(), status: z.status === "dostarczono" ? "dostarczono" : "zamowiono" });
     E.zamowienia[k] = z; zmiana(); rysujZamowienia();
@@ -701,8 +711,8 @@ document.addEventListener("click", async e => {
       <label class="full">Adres załadunku (u dostawcy)<input name="miejsce" value="${esc(dT?.adres || "")}" placeholder="ulica, kod, miasto" list="zapAdresy" autocomplete="off"><datalist id="zapAdresy">${listaT.filter(x => x.adres).map(x => `<option value="${esc(x.adres)}">${esc(x.nazwa)}</option>`).join("")}</datalist></label>
       <label>Dostawa do oddziału<select name="oddzial">${oddz.map(o => `<option ${o.nazwa === oddzOst ? "selected" : ""}>${esc(o.nazwa)}</option>`).join("")}</select></label>
       <div class="small full" style="align-self:end">${dT?.adres ? `Adres z listy dostawców Truck App (${esc(dT.nazwa)}).` : "Tego dostawcy nie ma z adresem na liście Truck App – wpisz adres albo zostaw puste (uzupełni biuro)."}</div>
-      <label class="full">Uwagi<input name="uwagi" value="${esc(`Zapytanie ${E.nazwa}${z.uwagi ? " · " + z.uwagi : ""}`)}"></label></div>
-      <div class="small">Pozycje (${g.pozycje.length}): ${esc(g.pozycje.map(p => p.w.a).join(" · "))}</div>`, [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Utwórz dostawę", cls: "primary" }]);
+      <label class="full">Uwagi<textarea name="uwagi" rows="3">${esc(`Zapytanie ${E.nazwa}${z.uwagi ? " · " + z.uwagi : ""}`)}</textarea></label></div>
+      <div class="small">Pozycje (${g.pozycje.length}): ${esc(g.pozycje.map(p => p.w.a).join(" · "))}</div>`, [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Utwórz dostawę", cls: "primary" }], { poOtwarciu: bezEnterZapisu });
     if (r.v !== "ok") return;
     await zapiszTeraz();
     const f = r.form, wg = L.naLiczbe(f.waga.value);
@@ -857,6 +867,8 @@ function odswiezWiersz(r) {
   });
   legenda();
 }
+// przycisk koloru w nagłówku dostawcy (zawsze, bez trybu wyboru)
+document.addEventListener("click", e => { const b = e.target.closest?.("#aGrid [data-kol]"); if (b && E) { e.preventDefault(); e.stopPropagation(); paletaNaglowka(+b.dataset.kol); } }, true);
 // tryb wyboru dostawcy – kliknięcia
 document.addEventListener("click", e => {
   if (!wybor || !E) return;

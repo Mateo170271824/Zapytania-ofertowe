@@ -110,6 +110,12 @@ try {
   ok("formuła =2,5*2 → 5,00 zł", b3 === "5,00 zł", b3);
   await p.click("#aWybor"); await p.click('#aGrid td[data-r="2"][data-c="3"]'); await p.click('#aGrid td[data-r="3"][data-c="3"]'); await p.click('#aGrid td[data-r="4"][data-c="3"]'); await W(300); await p.click("#aWybor"); await W(1800);
   ok("historia arkusza", (await txt(p, "#aLog")).includes("wybór dostawcy"));
+  // kolor dostawcy z przycisku w nagłówku (bez trybu wyboru): nadanie i usunięcie
+  await p.click('#aGrid [data-kol="2"]'); await p.waitForSelector("#dlg[open] [data-p]"); await p.click('#dlg [data-p="FFC000"]'); await W(600);
+  const kSP = await p.$eval('#aGrid td.dost[data-c="2"]', e => e.classList.contains("kol"));
+  await p.click('#aGrid [data-kol="2"]'); await p.waitForSelector("#dlg[open]"); await dlgOk(p, "brak"); await W(600);
+  ok("kolor dostawcy: wybór i usunięcie z nagłówka", kSP && !(await p.$eval('#aGrid td.dost[data-c="2"]', e => e.classList.contains("kol"))));
+  await p.click("#aKom"); ok("przycisk Pokaż komentarze", await p.$eval("#aBox", e => e.classList.contains("komentarze"))); await p.click("#aKom");
   // 3. zamówienie i dostawa w Logistyce
   const karta = "#aZam .sup-z";
   await p.waitForSelector(karta);
