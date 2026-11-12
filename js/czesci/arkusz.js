@@ -5,7 +5,7 @@ import * as ZM from "../zamowienia.js?v=202611121300";
 import { $, esc, today, fDT, fD, clone, fmt, zl, kolLit, hex, toast, failed, okno, pytanie, zapiszXlsx } from "../ui.js?v=202611121300";
 import { C } from "../baza.js?v=202611121300";
 
-import { B, G, LOG, M, P, PALETA, U, W, Z, czysc, diffZap, go, isOwner, me, render, user, widok, wpis, zaladowane, zapById, zapByNazwa, zapiszDok } from '../app.js?v=202611121300';
+import { B, G, LOG, M, P, PALETA, U, W, Z, zapytaniaPosort, czysc, diffZap, go, isOwner, me, render, user, widok, wpis, zaladowane, zapById, zapByNazwa, zapiszDok } from '../app.js?v=202611121300';
 import { dopiszDoBazy } from './ceny-widok.js?v=202611121300';
 import { logItem } from './dziennik.js?v=202611121300';
 import { genDirty, wczytajOferte, wybierzZListy, zapiszGenerator } from './generator.js?v=202611121300';
@@ -29,7 +29,8 @@ export function renderArkusz() {
   const proj = L.projektDlaZapytania(P, z.nazwa);
   M().innerHTML = `
     <div class="panel"><div class="hd">
-      <div class="toolbar"><a class="btn" href="#zapytania">← Lista</a><h2 class="mono" id="aNazwa">${esc(E.nazwa)}</h2>${isOwner ? `<button class="btn sm" id="aZmienNazwe">Zmień nazwę</button>` : ""}<span class="status" id="aStatus"></span></div>
+      <div class="toolbar"><a class="btn" href="#zapytania">← Lista</a>${(() => { const L2 = zapytaniaPosort(), i = L2.findIndex(x => x._id === z._id), st = L2[i + 1], nw = L2[i - 1];
+        return `<button class="btn nawZ" id="aPoprz" ${st ? `data-id="${st._id}" title="Starsze: ${esc(st.nazwa)} (Alt+←)"` : "disabled"} aria-label="Poprzednie zapytanie">‹</button><h2 class="mono" id="aNazwa">${esc(E.nazwa)}</h2><button class="btn nawZ" id="aNast" ${nw ? `data-id="${nw._id}" title="Nowsze: ${esc(nw.nazwa)} (Alt+→)"` : "disabled"} aria-label="Następne zapytanie">›</button>`; })()}${isOwner ? `<button class="btn sm" id="aZmienNazwe">Zmień nazwę</button>` : ""}<span class="status" id="aStatus"></span></div>
       <div class="toolbar">
         <button class="btn" id="aZListy">Dodaj z listy</button>
         <button class="btn" id="aWybor">Wybór dostawcy kolorem</button>
@@ -56,6 +57,8 @@ export function renderArkusz() {
   $("aKoszt").onclick = async () => { await zapiszTeraz(); kosztDlaZapytania(zapById(eId)); };
   $("aXls").onclick = () => eksportArkusza(E);
   $("aOferta").onclick = wczytajOferte;
+  const skocz = b => { if (b?.dataset.id) zapiszTeraz().then(() => go("z", b.dataset.id)); };
+  $("aPoprz").onclick = e => skocz(e.currentTarget); $("aNast").onclick = e => skocz(e.currentTarget);
   // historia zmian zwijana (domyślnie zwinięta, pamiętane na tym urządzeniu)
   const histOn = v => { $("aHist").classList.toggle("otw", v); $("aHistHd").setAttribute("aria-expanded", v); try { localStorage.setItem("zap_hist", v ? "1" : ""); } catch {} };
   let h0 = false; try { h0 = !!localStorage.getItem("zap_hist"); } catch {}
@@ -113,7 +116,9 @@ export function stanDostawcy(c, n) {
   const ile = E.wiersze.filter(w => L.vbaTrim(w.a) && (L.kolor(w.k) === k || L.kolor(w.c?.[c]?.k) === k)).length;
   const z = (E.zamowienia || {})[k] || {}, kurs = z.kursId ? kursySub.get(z.kursId)?.dane : null;
   const [kl, t] = (kurs?.status === "Dostarczone" || z.status === "dostarczono") ? ["p-ok", "dostarczono"] : z.kursId ? ["p-acc", "w Logistyce"] : z.status === "zamowiono" ? ["p-warn", z.nr ? "zam. " + z.nr : "zamówiono"] : ["p-idle", "nie zamówiono"];
-  return `<div class="zst">${btn}<span>${ile} poz.</span>${suma}<span class="pill ${kl}">${esc(t)}</span></div>`;
+  const zamowione = !!(z.kursId || z.status);
+  const usun = zamowione ? "" : `<button type="button" class="bezKol" data-bezkol="${c}" title="Usuń kolor tego dostawcy (nic nie zamówiono)" aria-label="usuń kolor">✕</button>`;
+  return `<div class="zst">${btn}<span>${ile} poz.</span>${suma}<span class="pill ${kl}">${esc(t)}</span>${usun}</div>`;
 }
 export const km = t => `<span class="km" title="${esc(t)}"></span><span class="kmT">${esc(t)}</span>`;
 export let dodWiersze = 0;          // puste wiersze dołożone Enterem / strzałką na końcu arkusza
@@ -433,6 +438,17 @@ export function odswiezWiersz(r) {
   });
   legenda();
 }
+// Alt+← / Alt+→ – poprzednie / następne zapytanie
+document.addEventListener("keydown", e => { if (!e.altKey || widok.nazwa !== "z" || !["ArrowLeft", "ArrowRight"].includes(e.key)) return; const b = $(e.key === "ArrowLeft" ? "aPoprz" : "aNast"); if (b && !b.disabled) { e.preventDefault(); b.click(); } });
+// zdjęcie koloru dostawcy z nagłówka i ze wszystkich jego pozycji
+function zdejmijKolor(n) {
+  const stary = L.kolor(n.k); if (stary === -1) return;
+  E.wiersze.forEach(w => { if (L.kolor(w.k) === stary) delete w.k; Object.values(w.c || {}).forEach(x => { if (L.kolor(x.k) === stary) delete x.k; }); });
+  delete n.k;
+}
+// „✕” przy niezamówionym dostawcy – szybkie usunięcie koloru
+document.addEventListener("click", e => { const b = e.target.closest?.("#aGrid [data-bezkol]"); if (!b || !E) return; e.preventDefault(); e.stopPropagation();
+  const n = E.naglowki?.[+b.dataset.bezkol]; if (!n) return; zdejmijKolor(n); zmiana(); rysujArkusz(); toast(`Usunięto kolor: ${L.vbaTrim(n.t || "")}`); }, true);
 // przycisk koloru w nagłówku dostawcy (zawsze, bez trybu wyboru)
 document.addEventListener("click", e => { const b = e.target.closest?.("#aGrid [data-kol]"); if (b && E) { e.preventDefault(); e.stopPropagation(); paletaNaglowka(+b.dataset.kol); } }, true);
 // tryb wyboru dostawcy – kliknięcia
@@ -467,10 +483,8 @@ export async function paletaNaglowka(c) {
     const nowy = r.form.dataset.wyb;
     E.wiersze.forEach(w => { if (stary !== -1 && L.kolor(w.k) === stary) w.k = nowy; Object.values(w.c || {}).forEach(x => { if (stary !== -1 && L.kolor(x.k) === stary) x.k = nowy; }); });
     n.k = nowy;
-  } else if (r.v === "brak") {
-    E.wiersze.forEach(w => { if (L.kolor(w.k) === stary) delete w.k; Object.values(w.c || {}).forEach(x => { if (L.kolor(x.k) === stary) delete x.k; }); });
-    delete n.k;
-  } else return;
+  } else if (r.v === "brak") zdejmijKolor(n);
+  else return;
   zmiana(); rysujArkusz();
 }
 // pasek przy komórce: komentarz, wiersze, kolumny

@@ -326,3 +326,9 @@ table.ark .tagM{background:var(--sunk);color:var(--muted);border:1px solid var(-
 .panel.hist.otw .strz{transform:rotate(90deg)}
 .panel.hist:not(.otw) #aLog{display:none}
 .panel.hist:not(.otw) .hd{border-bottom:0}
+.btn.nawZ{font-size:22px;line-height:1;padding:4px 12px;min-width:40px}
+.btn.nawZ:disabled{opacity:.35;cursor:default}
+.btn.nawZ{font-size:22px;line-height:1;padding:4px 12px;min-width:40px}
+.btn.nawZ:disabled{opacity:.35;cursor:default}
+table.ark2 .bezKol{border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:50%;width:20px;height:20px;padding:0;font-size:11px;line-height:1;cursor:pointer}
+table.ark2 .bezKol:hover{color:#c62828;border-color:#c62828}

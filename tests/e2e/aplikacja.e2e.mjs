@@ -115,8 +115,8 @@ try {
   // kolor dostawcy z przycisku w nagłówku (bez trybu wyboru): nadanie i usunięcie
   await p.click('#aGrid [data-kol="2"]'); await p.waitForSelector("#dlg[open] [data-p]"); await p.click('#dlg [data-p="FFC000"]'); await W(600);
   const kSP = await p.$eval('#aGrid td.dost[data-c="2"]', e => e.classList.contains("kol"));
-  await p.click('#aGrid [data-kol="2"]'); await p.waitForSelector("#dlg[open]"); await dlgOk(p, "brak"); await W(600);
-  ok("kolor dostawcy: wybór i usunięcie z nagłówka", kSP && !(await p.$eval('#aGrid td.dost[data-c="2"]', e => e.classList.contains("kol"))));
+  await p.click('#aGrid [data-bezkol="2"]'); await W(600);
+  ok("kolor dostawcy: wybór z nagłówka i usunięcie ✕ (nie zamówiono)", kSP && !(await p.$eval('#aGrid td.dost[data-c="2"]', e => e.classList.contains("kol"))));
   await p.click("#aKom"); ok("przycisk Pokaż komentarze", await p.$eval("#aBox", e => e.classList.contains("komentarze"))); await p.click("#aKom");
   // 3. zamówienie i dostawa w Logistyce
   const karta = "#aZam .sup-z";
@@ -128,6 +128,7 @@ try {
   await W(1500);
   await baza(async db => { const d = (await getDocs(collection(db, "zap_ceny"))).docs.map(x => x.data()).find(x => x.nazwa === "Kątownik 50x50x5 S235 6m");
     ok("zamówienie: nowa pozycja w bazie z ceną", d && d.historia?.[0]?.c === 4.9 && d.zrodlo === "zamowienie", JSON.stringify(d && { jm: d.jm, c: d.historia[0].c, skad: d.skad })); });
+  ok("zamówiony dostawca bez ✕", !(await p.$('#aGrid [data-bezkol="3"]')));
   ok("stan zamówienia nad dostawcą", (await txt(p, "#aGrid tr.r1")).includes("zam. ZD 7/" + rok));
   await zrzut(p, "arkusz");
   await p.click(karta + ' [data-za="kurs"]'); await p.waitForSelector("#dlg[open]");
@@ -232,6 +233,10 @@ try {
   const hdr = await txt(p, '#aGrid td.dost[data-c="3"]');
   ok("oferta z PDF: dostawca, ceny i suma za m²", dP === "Hurt Metal" && c33 === "39,90 zł" && hdr.includes("Σ 21 185 zł"), `${dP} | ${c33} | ${hdr.replace(/\n/g, " ")}`);
   await zrzut(p, "trapez");
+  { const n0 = await txt(p, "#aNazwa"), nastOff = await p.$eval("#aNast", b => b.disabled);
+    await p.click("#aPoprz"); await p.waitForFunction(n => document.getElementById("aNazwa")?.textContent !== n, n0); const n1 = await txt(p, "#aNazwa");
+    await p.keyboard.press("Alt+ArrowRight"); await p.waitForFunction(n => document.getElementById("aNazwa")?.textContent === n, n0);
+    ok("strzałki ‹ › między zapytaniami", nastOff && n1 !== n0, `${n0} → ${n1} → ${await txt(p, "#aNazwa")}`); }
   // 7. zastępstwo
   await p.click("#tabs [data-v=dostep]"); await W(800);
   await p.selectOption("#gKto", U.zastepca); const d = new Date(); d.setDate(d.getDate() + 5); await p.fill("#gDo", d.toISOString().slice(0, 10));
