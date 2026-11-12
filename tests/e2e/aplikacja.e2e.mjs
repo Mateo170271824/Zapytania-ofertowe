@@ -144,6 +144,19 @@ try {
   await baza(async db => { const L = (await getDocs(collection(db, "zak_zam"))).docs.map(x => x.data());
     ok("Zakupy: zamówienie zapisane (indeks, tony, ZD, dostawca)", L.length === 1 && L[0].key === "120x80x3 / 6000" && Math.abs(L[0].t - 0.21) < 0.001 && L[0].zd === "ZD 7/" + rok && L[0].sup === "Hurt Metal", JSON.stringify(L[0])); });
   ok("Zakupy: znacznik w karcie zamówienia", (await txt(p, karta)).includes("w Zakupach profili: 1 poz."));
+  // 3b. projekt: pozycja dopisana do zapytania „do projektu” i edycja ilości w projekcie
+  await p.click("#aZListy"); await p.waitForSelector("#wlN");
+  await p.fill("#wlN", "IPE 330 S355 12m"); await p.fill("#wlI", "2"); await p.keyboard.press("Enter"); await W(200);
+  await dlgOk(p); await p.waitForSelector("#dlg[open]"); ok("pytanie: do projektu czy na magazyn", (await txt(p, "#dlg")).includes("Do projektu")); await dlgOk(p, "proj"); await W(2500);
+  ok("wiersz oznaczony P (projekt)", (await p.$$eval("#aGrid .tagP", t => t.length)) === 3 + 1, (await p.$$eval("#aGrid .tagP", t => t.length)) + " wierszy P");
+  await p.click("#aProj"); await p.waitForSelector("#pjRows tr[data-i]");
+  await p.fill('#pjRows tr[data-i="0"] [data-f="ilosc"]', "3"); await dlgOk(p); await W(2500);
+  await baza(async db => { const pr = (await getDocs(collection(db, "zap_projekty"))).docs[0].data(), P0 = pr.pozycje;
+    const ipe = P0.find(x => x.nazwa === "IPE 330 S355 12m");
+    ok("projekt: zmieniona ilość i nowa pozycja IPE 330 12m", P0[0].ilosc === 3 && ipe && ipe.ilosc === 2 && ipe.tresc === "IPE 330 S355 12m- 2 szt" && ipe.ark === `1-${rok}`, JSON.stringify(P0.map(x => [x.nazwa, x.ilosc, x.niez]))); });
+  await p.click("#aKoszt"); await p.waitForSelector("#kEdytuj", { timeout: 15000 }); await W(500);
+  ok("koszt projektu z nową pozycją", (await txt(p, "#widok")).includes("IPE 330 S355 12m"));
+  await p.goBack(); await p.waitForSelector("#aGrid table"); await W(500);
   // 4. zapytanie na magazyn z ręczną pozycją
   await p.click("#tabs [data-v=zapytania]"); await W(400);
   await p.click("#lMag"); await p.waitForSelector("#wlN");

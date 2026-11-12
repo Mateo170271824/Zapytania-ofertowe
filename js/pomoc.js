@@ -35,6 +35,7 @@ export const POMOC = {
     t: "Projekty",
     h: `<ul>
       <li>Projekt powstaje razem z zapytaniem z Generatora (pozycje i ilości z Subiekta).</li>
+      <li><b>Edytuj projekt</b> (w zapytaniu i w koszcie): zmiana ilości, podpięcie pod inny wiersz zapytania, nowe pozycje – np. zamiast 3 × IPE 330 10 m: 1 × 10 m i 2 × 12 m. Przy „Dodaj z listy” wybierasz: do projektu albo na magazyn; w arkuszu wiersze projektu mają znaczek <b>P</b>, pozostałe <b>M</b>.</li>
       <li><b>Koszt projektu</b>: magazyn liczony po cenie ostatniego zakupu, zakup – po cenie wybranego dostawcy (profile i rury za mb, reszta za kg), tylko ilość potrzebna na projekt. Z kosztu robi się PDF „Wycena wewnętrzna”.</li>
     </ul>`,
   },

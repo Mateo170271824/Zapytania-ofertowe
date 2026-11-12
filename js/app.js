@@ -172,7 +172,13 @@ const POLA_PROJ = { kod: "kod klienta" };
 function diffProj(a, b) {
   a = a || { pozycje: [] }; const out = [];
   for (const [k, l] of Object.entries(POLA_PROJ)) if (sv(a[k]) !== sv(b[k])) out.push({ p: l, a: sv(a[k]), b: sv(b[k]) });
-  if (JSON.stringify(a.pozycje) !== JSON.stringify(b.pozycje)) out.push({ p: "pozycje projektu", a: a.pozycje?.length ? a.pozycje.length + " poz." : "", b: b.pozycje.length + " poz." });
+  if (JSON.stringify(a.pozycje) !== JSON.stringify(b.pozycje)) {
+    out.push({ p: "pozycje projektu", a: a.pozycje?.length ? a.pozycje.length + " poz." : "", b: b.pozycje.length + " poz." });
+    const opis = x => `${x.nazwa} – ${L.ogolny(L.liczba(x.ilosc))} ${x.jm || ""}${x.tresc ? " (" + x.tresc + ")" : ""}`;
+    const A = (a.pozycje || []).map(opis), Bp = (b.pozycje || []).map(opis);
+    A.filter(x => !Bp.includes(x)).slice(0, 20).forEach(x => out.push({ p: "pozycja projektu", a: x, b: "" }));
+    Bp.filter(x => !A.includes(x)).slice(0, 20).forEach(x => out.push({ p: "pozycja projektu", a: "", b: x }));
+  }
   return out;
 }
 
@@ -498,6 +504,7 @@ function renderArkusz() {
         <button class="btn" id="aKoszt">Koszt projektu${proj ? "" : " (brak danych)"}</button>
         <button class="btn" id="aXls">Pobierz jako Excel</button>
         <button class="btn" id="aKom" title="Pokaż treść komentarzy w komórkach">Pokaż komentarze</button>
+        ${proj ? `<button class="btn" id="aProj" title="Pozycje liczone do kosztu projektu">Edytuj projekt</button>` : ""}
         ${isOwner ? `<button class="btn danger" id="aUsun">Usuń</button>` : ""}
       </div></div>
       <div class="bd legend" id="aLegenda"></div>
@@ -513,14 +520,26 @@ function renderArkusz() {
   $("aWaga").onclick = async () => { await zapiszTeraz(); go("waga", eId); };
   $("aKoszt").onclick = async () => { await zapiszTeraz(); kosztDlaZapytania(zapById(eId)); };
   $("aXls").onclick = () => eksportArkusza(E);
+  $("aProj") && ($("aProj").onclick = async () => { await zapiszTeraz(); const pr = L.projektDlaZapytania(P, E.nazwa); if (pr) edytujProjekt(pr, E.nazwa); });
   const komOn = v => { $("aBox").classList.toggle("komentarze", v); $("aKom").classList.toggle("on", v); $("aKom").textContent = v ? "Ukryj komentarze" : "Pokaż komentarze"; try { localStorage.setItem("zap_kom", v ? "1" : ""); } catch {} };
   let kom0 = false; try { kom0 = !!localStorage.getItem("zap_kom"); } catch {}
   komOn(kom0); $("aKom").onclick = () => komOn(!$("aBox").classList.contains("komentarze"));
   $("aZListy").onclick = async () => {
     const wyb = await wybierzZListy(); if (!wyb) return;
+    const pr = L.projektDlaZapytania(P, E.nazwa);
+    let doProj = false;
+    if (pr) {
+      const r = await okno(`<h3>Dodane pozycje (${wyb.length})</h3><p>Zapytanie ma projekt <b>${esc(pr.id)}</b>. Czy te pozycje liczyć do kosztu projektu?</p>
+        <ul class="small">${wyb.slice(0, 8).map(x => `<li>${esc(L.trescPozycji({ nazwa: x.nazwa, ilZap: x.ilosc, jm: x.jm }))}</li>`).join("")}${wyb.length > 8 ? "<li>…</li>" : ""}</ul>`,
+        [{ v: "cancel", t: "Anuluj", nv: true }, { v: "mag", t: "Na magazyn" }, { v: "proj", t: "Do projektu", cls: "primary" }]);
+      if (r.v !== "mag" && r.v !== "proj") return;
+      doProj = r.v === "proj";
+    }
     przytnij();
-    for (const x of wyb) E.wiersze.push({ a: L.trescPozycji({ nazwa: x.nazwa, ilZap: x.ilosc, jm: x.jm }), c: {} });
-    zmiana(); rysujArkusz(); toast(`Dodano ${wyb.length} poz.`);
+    const nowe = wyb.map(x => L.trescPozycji({ nazwa: x.nazwa, ilZap: x.ilosc, jm: x.jm }));
+    for (const a of nowe) E.wiersze.push({ a, c: {} });
+    zmiana(); rysujArkusz(); toast(`Dodano ${wyb.length} poz.${pr ? (doProj ? " do projektu" : " na magazyn") : ""}`);
+    if (doProj) { await zapiszTeraz(); await zapiszProjekt(pr, [...pr.pozycje, ...wyb.map((x, i) => pozycjaProjektu(nowe[i], x))], "dodanie pozycji z zapytania"); }
   };
   $("aUsun") && ($("aUsun").onclick = usunZapytanie);
   $("aZmienNazwe") && ($("aZmienNazwe").onclick = zmienNazwe);
@@ -558,6 +577,8 @@ function rysujArkusz() {
   const g = $("aGrid"); if (!g || !E) return;
   const ostK = Math.max(L.ostKolumna(E), 4), nW = Math.max(E.wiersze.length + 3, 6) + dodWiersze;
   const naglowki = E.naglowki || {};
+  // które wiersze liczą się do kosztu projektu (treść podpięta w pozycji projektu)
+  const prA = L.projektDlaZapytania(P, E.nazwa), doProj = new Set((prA?.pozycje || []).filter(x => L.LC(x.ark || "") === L.LC(E.nazwa)).map(x => L.LC(L.vbaTrim(x.tresc || ""))).filter(Boolean));
   // szerokość kolumny dopasowana do najdłuższego tekstu (nagłówek albo komórka), 160–320 px
   const tel = innerWidth < 700;      // na telefonie wąska kolumna A (zawija tekst), żeby było widać ceny
   const szer = c => { let n = String(naglowki[c]?.t ?? "").length; for (const w of E.wiersze) n = Math.max(n, wartWyswietl(w.c?.[c], c).length); return tel ? szerKol(n * 0.85, 96, 170) : szerKol(n, 160, 320); };
@@ -573,7 +594,7 @@ function rysujArkusz() {
   for (let i = 0; i < nW; i++) {
     const w = E.wiersze[i] || { a: "", c: {} }, r = i + 2, kA = L.kolor(w.k);
     const skr = L.skrajneCeny(w, 30);
-    h += `<tr><td class="rn" title="wiersz ${r}">${L.vbaTrim(w.a) ? r - 1 : ""}</td><td class="a ${kA !== -1 ? "kol" : ""}" data-r="${r}" data-c="1" style="${kA !== -1 ? `--k:${hex(kA)}` : ""}">${w.m ? km(w.m) : ""}<textarea rows="1" data-r="${r}" data-c="1" aria-label="A${r}">${esc(w.a)}</textarea></td>`;
+    h += `<tr><td class="rn" title="wiersz ${r}">${L.vbaTrim(w.a) ? r - 1 : ""}${prA && L.vbaTrim(w.a) ? (doProj.has(L.LC(L.vbaTrim(w.a))) ? `<span class="tagP" title="liczone do kosztu projektu ${esc(prA.id)}">P</span>` : `<span class="tagM" title="nie w projekcie (magazyn)">M</span>`) : ""}</td><td class="a ${kA !== -1 ? "kol" : ""}" data-r="${r}" data-c="1" style="${kA !== -1 ? `--k:${hex(kA)}` : ""}">${w.m ? km(w.m) : ""}<textarea rows="1" data-r="${r}" data-c="1" aria-label="A${r}">${esc(w.a)}</textarea></td>`;
     for (let c = 2; c <= ostK; c++) {
       const cel = w.c?.[c], kc = L.kolor(cel?.k), cls = skr.min.has(c) ? "min" : skr.max.has(c) ? "max" : "";
       const kw = kc !== -1 ? kc : (kA !== -1 && L.kolor(naglowki[c]?.k) === kA ? kA : -1);     // cena wybranego dostawcy w tym wierszu
@@ -1071,6 +1092,50 @@ async function kosztDlaZapytania(z) {
     await czekajNa(() => projById(rr.id)); go("koszt", rr.id);
   } catch (x) { failed(x); }
 }
+// ---------- edycja projektu: pozycje liczone do kosztu (np. IPE 330 3×10 m → 1×10 m + 2×12 m)
+// pozycja projektu z wiersza zapytania: całość do zakupu (niez = −ilość), cena z zapytania
+function pozycjaProjektu(tresc, x = {}) {
+  const pk = ZM.pozycjaDoKursu(tresc), il = typeof x.ilosc === "number" ? x.ilosc : pk.ilosc;
+  return { symbol: x.symbol || "", nazwa: x.nazwa || pk.nazwa, jm: x.jm || pk.jm, ilosc: il, niez: -il, nazd: 0, zapytano: "TAK", ark: E?.nazwa || "", tresc, dodana: true };
+}
+async function zapiszProjekt(pr, pozycje, akcja) {
+  try {
+    const { _id, ...d } = pr;
+    const r = await zapiszDok(C.p, _id, { ...d, pozycje: pozycje.map(czysc) }, { typ: "projekt", etykieta: pr.id, diffFn: diffProj, wersja: pr.wersja || 0, akcja });
+    if (r?.conflict) return toast("Ktoś zmienił projekt w międzyczasie – otwórz go ponownie");
+    toast("Zapisano projekt " + pr.id);
+  } catch (x) { failed(x); }
+}
+async function edytujProjekt(pr, nazwaZap) {
+  const zap = zapByNazwa(nazwaZap || pr.id) || Z.find(z => pr.pozycje.some(x => L.LC(x.ark) === L.LC(z.nazwa)));
+  const wierszeZ = (zap?.wiersze || []).map(w => L.vbaTrim(w.a)).filter(Boolean);
+  const poz = clone(pr.pozycje);
+  const zMag = x => Math.min(Math.max(L.liczba(x.ilosc) + L.liczba(x.niez), 0), L.liczba(x.ilosc));
+  const opcjeW = sel => `<option value="">– bez wiersza (cena zakupu z Subiekta) –</option>` + wierszeZ.map(t => `<option ${L.LC(t) === L.LC(sel || "") ? "selected" : ""}>${esc(t)}</option>`).join("")
+    + (sel && !wierszeZ.some(t => L.LC(t) === L.LC(sel)) ? `<option selected value="${esc(sel)}">${esc(sel)} (nie ma już w zapytaniu)</option>` : "");
+  const wiersz = (x, i) => `<tr data-i="${i}"><td><input data-f="nazwa" value="${esc(x.nazwa)}"></td><td style="width:60px"><input data-f="jm" value="${esc(x.jm || "")}"></td>
+    <td style="width:80px"><input data-f="ilosc" inputmode="decimal" value="${esc(L.ogolny(L.liczba(x.ilosc)))}"></td><td style="width:80px"><input data-f="zmag" inputmode="decimal" value="${esc(L.ogolny(zMag(x)))}" title="ile z tej ilości bierzemy z magazynu"></td>
+    <td><select data-f="tresc">${opcjeW(x.tresc)}</select></td><td style="width:40px"><button type="button" class="btn sm" data-del="${i}" title="Usuń z projektu">✕</button></td></tr>`;
+  const r = await okno(`<h3>Projekt ${esc(pr.id)} – pozycje do kosztu</h3>
+    <p class="small">Zmień ilości albo podepnij pozycję pod inny wiersz zapytania (np. zamiast 3 × IPE 330 10 m: 1 × 10 m i nowa pozycja 2 × 12 m). „Z magazynu” – część brana z magazynu wg ceny ostatniego zakupu, reszta wg ceny wybranego dostawcy.</p>
+    <div class="tablebox" style="max-height:52vh;overflow:auto"><table class="t ed"><thead><tr><th>Pozycja</th><th>J.m.</th><th>Ilość</th><th>Z magazynu</th><th>Wiersz zapytania ${zap ? esc(zap.nazwa) : ""}</th><th></th></tr></thead><tbody id="pjRows">${poz.map(wiersz).join("")}</tbody></table></div>
+    ${wierszeZ.length ? `<div class="toolbar" style="margin-top:8px"><select id="pjNowy" style="flex:1 1 300px"><option value="">Dodaj pozycję z wiersza zapytania…</option>${wierszeZ.map(t => `<option>${esc(t)}</option>`).join("")}</select><button type="button" class="btn" id="pjDodaj">+ Dodaj do projektu</button></div>` : ""}`,
+    [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Zapisz projekt", cls: "primary" }],
+    { szer: "min(1000px, calc(100vw - 24px))", poOtwarciu: f => {
+      bezEnterZapisu(f);
+      const odczyt = () => f.querySelectorAll("#pjRows tr[data-i]").forEach(tr => { const x = poz[+tr.dataset.i]; if (!x) return; const v = n => tr.querySelector(`[data-f="${n}"]`).value;
+        x.nazwa = v("nazwa").trim(); x.jm = v("jm").trim(); const il = L.naLiczbe(v("ilosc")), zm = L.naLiczbe(v("zmag"));
+        x.ilosc = il.ok ? il.w : 0; x.niez = (zm.ok ? Math.min(zm.w, x.ilosc) : 0) - x.ilosc; x.tresc = v("tresc"); x.ark = x.tresc ? (zap?.nazwa || x.ark) : x.ark; });
+      const rysuj = () => { f.querySelector("#pjRows").innerHTML = poz.map((x, i) => x ? wiersz(x, i) : "").join(""); };
+      f.querySelector("#pjRows").addEventListener("click", e => { const b = e.target.closest("[data-del]"); if (b) { odczyt(); poz[+b.dataset.del] = null; rysuj(); } });
+      f.querySelector("#pjDodaj")?.addEventListener("click", () => { const t = f.querySelector("#pjNowy").value; if (!t) return; odczyt(); poz.push(pozycjaProjektu(t)); poz.at(-1).ark = zap?.nazwa || ""; rysuj(); f.querySelector("#pjNowy").value = ""; });
+      f.addEventListener("submit", odczyt, true); f._odczyt = odczyt;
+    } });
+  if (r.v !== "ok") return;
+  r.form._odczyt?.();
+  await zapiszProjekt(pr, poz.filter(Boolean), "edycja pozycji projektu");
+  if (widok.nazwa === "koszt") render();
+}
 let ostatniKoszt = null;
 async function renderKoszt() {
   const p = projById(widok.arg);
@@ -1083,7 +1148,7 @@ async function renderKoszt() {
   const z = zapByNazwa(p.id);
   M().innerHTML = `
   <div class="panel"><div class="hd"><div class="toolbar">${z ? `<a class="btn" href="#z-${z._id}">← ${esc(z.nazwa)}</a>` : `<a class="btn" href="#projekty">← Projekty</a>`}<h2>Koszt materiału projektu</h2></div>
-    <div class="toolbar"><button class="btn primary" id="kPdf">Generuj do PDF</button></div></div>
+    <div class="toolbar"><button class="btn" id="kEdytuj">Edytuj projekt</button><button class="btn primary" id="kPdf">Generuj do PDF</button></div></div>
     <div class="bd small">Projekt / zapytanie: <b>${esc(p.id)}</b> | Klient: <b>${esc(p.kod)}</b> | ${fDT(new Date())}</div></div>
   <div class="kpis"><div class="kpi"><span class="lbl">Klient</span><span class="val">${esc(p.kod || "–")}</span></div><div class="kpi"><span class="lbl">Pozycji</span><span class="val">${k.pozycje.length}</span></div>
     <div class="kpi"><span class="lbl">Waga całości</span><span class="val">${fmt(R1(k.sumWaga), 1)} kg</span></div><div class="kpi"><span class="lbl">Koszt razem</span><span class="val">${zl(R2(k.sumMag + k.sumZak))}</span></div></div>
@@ -1108,6 +1173,7 @@ async function renderKoszt() {
   <details class="panel"><summary class="bd strong" style="cursor:pointer">Dane projektu z Subiekta (arkusz PROJEKTY) – ${p.pozycje.length} poz., zapisane ${fD(p.data)}</summary>
     <div class="tablebox"><table class="t" style="min-width:1300px"><thead><tr><th>PROJEKT</th><th>KOD KLIENTA</th><th>DATA</th><th>SYMBOL</th><th>NAZWA</th><th>J.M.</th><th class="num">ILOŚĆ W DOK.</th><th class="num">NIEZAREZ.</th><th class="num">NA ZD</th><th class="num">CENA ZAKUPU</th><th>ZAPYTANO</th><th>ARKUSZ ZAPYTANIA</th><th>TREŚĆ W ZAPYTANIU</th></tr></thead><tbody>
     ${p.pozycje.map(x => `<tr><td>${esc(p.id)}</td><td>${esc(p.kod)}</td><td>${fD(p.data)}</td><td class="mono">${esc(x.symbol)}</td><td>${esc(x.nazwa)}</td><td>${esc(x.jm)}</td><td class="num">${L.ogolny(x.ilosc)}</td><td class="num">${L.ogolny(x.niez)}</td><td class="num">${L.ogolny(x.nazd)}</td><td class="num">${x.cz !== undefined ? L.ogolny(x.cz) : ""}</td><td>${esc(x.zapytano)}</td><td>${esc(x.ark)}</td><td>${esc(x.tresc)}</td></tr>`).join("")}</tbody></table></div></details>`;
+  $("kEdytuj").onclick = () => edytujProjekt(p);
   $("kPdf").onclick = async () => {
     try { const pdf = await import("./pdf.js?v=202611061834"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
     catch (x) { console.error(x); toast("Nie udało się zrobić PDF: " + (x.message || x)); }
