@@ -1,5 +1,6 @@
 import * as L from "./logika.js?v=202611061834";
 import * as I from "./import-excel.js?v=202611061834";
+import * as OF from "./oferty.js?v=202611061834";
 import * as KP from "./kopia.js?v=202611061834";
 import * as ZM from "./zamowienia.js?v=202611061834";
 import { $, esc, pad, iso, today, toD, fDT, fD, clone, uidS, fmt, zl, ogolnyLiczba, kolLit, hex, toast, failed, show, msg, okno, pytanie, kopiuj, pobierzPlik, czytajPlik, zapiszXlsx, natywna } from "./ui.js?v=202611061834";
@@ -397,6 +398,78 @@ async function wybierzZListy() {
   return wynik;
 }
 // zapytanie na magazyn: pozycje z listy materiałów, bez generatora i bez danych projektu
+// ---------- zapytanie na blachę trapezową: wiersz = budowa (kod budowy | profil, grubość, powłoka – m²), cena w zł/m²
+async function zapytanieTrapez() {
+  const rok = L.rokNumeru(U), nr = L.nastepnyNumer(Z.map(z => z.nazwa), rok);
+  const PROFILE = ["T7", "T14", "T18", "T20", "T35", "T45", "T50", "T55", "T85", "T130", "T135", "T150"];
+  const wiersz = () => `<tr><td><input data-f="kod" placeholder="np. BUD-17/2026"></td><td style="width:90px"><input data-f="profil" list="trProfile" placeholder="T35"></td>
+    <td style="width:80px"><input data-f="grubosc" inputmode="decimal" placeholder="0,5"></td><td><input data-f="powloka" placeholder="RAL 7016 poliester"></td><td style="width:90px"><input data-f="m2" inputmode="decimal" placeholder="m²"></td></tr>`;
+  const r = await okno(`<h3>Zapytanie – blacha trapezowa</h3>
+    <div class="grid2"><label>Numer<input name="n" value="${nr}-${rok}" required></label><label>Kod (komórka A1)<input name="k" value="TRAPEZ"></label></div>
+    <p class="small">Jeden wiersz = jedna budowa. Dostawcy dostaną listę z kodami budów i prośbą o cenę za m² – odpowiedź (mail albo PDF) wczytasz w zapytaniu przyciskiem „Wczytaj ofertę”.</p>
+    <div class="tablebox"><table class="t ed"><thead><tr><th>Kod budowy</th><th>Profil</th><th>Grubość [mm]</th><th>Powłoka / kolor</th><th>Ilość [m²]</th></tr></thead><tbody id="trRows">${wiersz()}${wiersz()}${wiersz()}</tbody></table></div>
+    <datalist id="trProfile">${PROFILE.map(x => `<option value="${x}">`).join("")}</datalist>
+    <button type="button" class="btn sm" id="trDodaj" style="margin-top:6px">+ Wiersz</button>`,
+    [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Utwórz zapytanie", cls: "primary" }],
+    { szer: "min(900px, calc(100vw - 24px))", poOtwarciu: f => { bezEnterZapisu(f); f.querySelector("#trDodaj").onclick = () => f.querySelector("#trRows").insertAdjacentHTML("beforeend", wiersz()); } });
+  if (r.v !== "ok") return;
+  const pozycje = [...r.form.querySelectorAll("#trRows tr")].map(tr => Object.fromEntries([...tr.querySelectorAll("[data-f]")].map(i => [i.dataset.f, i.value.trim()])))
+    .filter(x => x.kod || x.profil || x.m2).map(OF.wierszTrapez);
+  if (!pozycje.length) return toast("Wpisz przynajmniej jedną budowę");
+  const nazwa = L.wolnaNazwa(Z.map(z => z.nazwa), r.form.n.value.trim() || `${nr}-${rok}`), kod = r.form.k.value.trim(), m = nazwa.match(/^(\d+)-(\d{4})/);
+  try {
+    const z = await zapiszDok(C.z, null, { nazwa, kod, typ: "trapez", numer: m ? +m[1] : null, rok: m ? +m[2] : null, naglowki: {}, wiersze: pozycje.map(a => ({ a, c: {} })), dataZap: today(), magazyn: true, kolejnosc: Math.max(0, ...Z.map(z => z.kolejnosc ?? 0)) + 1 },
+      { typ: "zapytanie", etykieta: nazwa, diffFn: diffZap });
+    const o = await okno(`<h3>Zapytanie gotowe</h3><p>Utworzono: <b>${esc(nazwa)}</b> – ${pozycje.length} budów.</p><p>Przygotować maila do dostawców?</p>`, [{ v: "nie", t: "Nie", nv: true }, { v: "tak", t: "Tak", cls: "primary" }]);
+    const zz = await czekajNa(() => zapById(z.id));
+    if (o.v === "tak" && zz) await oknoMail(zz);
+    go("z", z.id);
+  } catch (x) { failed(x); }
+}
+// ---------- wczytanie oferty: mail .eml, PDF albo wklejony tekst → ceny w kolumnie dostawcy
+let pdfjsGotowy = null;
+async function tekstPdf(dane) {
+  pdfjsGotowy ||= new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "vendor/pdfjs/pdf.min.js"; sc.onload = () => { globalThis.pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdfjs/pdf.worker.min.js"; res(globalThis.pdfjsLib); }; sc.onerror = rej; document.head.append(sc); });
+  const lib = await pdfjsGotowy, doc = await lib.getDocument({ data: dane }).promise, out = [];
+  for (let i = 1; i <= doc.numPages; i++) { const c = await (await doc.getPage(i)).getTextContent(); out.push(c.items.map(x => x.str + (x.hasEOL ? "\n" : " ")).join("")); }
+  return out.join("\n");
+}
+async function wczytajOferte() {
+  const r = await okno(`<h3>Wczytaj ofertę – ${esc(E.nazwa)}</h3>
+    <p class="small">Zapisany mail (.eml – w Thunderbirdzie: Zapisz jako… / przeciągnij na pulpit), PDF z oferty albo wklejony tekst maila. Aplikacja znajdzie dostawcę, kody budów i ceny za m² – przed wpisaniem pokaże podgląd.</p>
+    <label class="btn filebtn">Wybierz plik (.eml, .pdf, .txt)<input type="file" name="plik" accept=".eml,.pdf,.txt,message/rfc822,application/pdf,text/plain"></label>
+    <label class="full">albo wklej treść<textarea name="tekst" rows="6" placeholder="Wklej treść maila z ofertą"></textarea></label>`,
+    [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Dalej", cls: "primary" }], { poOtwarciu: bezEnterZapisu });
+  if (r.v !== "ok") return;
+  const f = r.form.plik.files?.[0];
+  let oferta = { od: "", temat: "", tekst: r.form.tekst.value || "", pdfy: [] };
+  try {
+    if (f && /\.eml$/i.test(f.name)) oferta = OF.czytajEml(OF.binarny(new Uint8Array(await czytajPlik(f))));
+    else if (f && /\.pdf$/i.test(f.name)) oferta.pdfy = [{ nazwa: f.name, dane: new Uint8Array(await czytajPlik(f)) }];
+    else if (f) oferta.tekst = new TextDecoder().decode(await czytajPlik(f));
+    for (const p of oferta.pdfy) oferta.tekst += "\n" + await tekstPdf(p.dane);
+  } catch (x) { return okno(`<h3>Wczytaj ofertę</h3><p>Nie udało się odczytać pliku: ${esc(x.message || x)}</p>`); }
+  const wiersze = E.wiersze.map((w, i) => ({ r: i + 2, a: L.vbaTrim(w.a) })).filter(w => w.a);
+  const kand = [...Object.values(E.naglowki || {}).map(h => ({ nazwa: L.vbaTrim(h.t || "") })), ...(U.dostawcy || []).map(d => ({ nazwa: L.vbaTrim(d.dostawca || ""), email: d.email }))];
+  const dost = OF.rozpoznajDostawce(oferta, kand), ceny = OF.cenyDlaWierszy(oferta.tekst, wiersze);
+  const cenaW = new Map(ceny.map(c => [c.r, c]));
+  const r2 = await okno(`<h3>Oferta ${oferta.temat ? "– " + esc(oferta.temat) : ""}</h3>
+    ${oferta.od ? `<p class="small">Od: ${esc(oferta.od)}${oferta.pdfy.length ? " · załączniki PDF: " + oferta.pdfy.length : ""}</p>` : ""}
+    <label>Dostawca (kolumna)<input name="dost" value="${esc(dost)}" list="ofDost" required placeholder="nazwa dostawcy"></label><datalist id="ofDost">${[...new Set(kand.map(k => k.nazwa).filter(Boolean))].map(n => `<option value="${esc(n)}">`).join("")}</datalist>
+    <p class="small">Znalezione ceny: <b>${ceny.length}</b> z ${wiersze.length} wierszy. Popraw albo wpisz brakujące – puste pola nie zmienią arkusza.</p>
+    <div class="tablebox" style="max-height:48vh;overflow:auto"><table class="t ed"><thead><tr><th>Pozycja / budowa</th><th>Cena${E.typ === "trapez" ? " [zł/m²]" : ""}</th><th>Fragment oferty</th></tr></thead><tbody>
+    ${wiersze.map(w => { const c = cenaW.get(w.r); return `<tr><td>${esc(w.a)}</td><td style="width:110px"><input data-r="${w.r}" inputmode="decimal" value="${c ? esc(L.ogolny(c.cena)) : ""}"></td><td class="small">${c ? esc(c.fragment) : "–"}</td></tr>`; }).join("")}</tbody></table></div>
+    ${!ceny.length && oferta.tekst.trim() ? `<details><summary class="small">Tekst oferty (nie znalazłem cen za m²)</summary><pre class="small" style="white-space:pre-wrap;max-height:200px;overflow:auto">${esc(oferta.tekst.slice(0, 4000))}</pre></details>` : ""}`,
+    [{ v: "cancel", t: "Anuluj", nv: true }, { v: "ok", t: "Wpisz ceny do zapytania", cls: "primary" }], { szer: "min(1000px, calc(100vw - 24px))", poOtwarciu: bezEnterZapisu });
+  if (r2.v !== "ok") return;
+  const nazwaD = r2.form.dost.value.trim(); if (!nazwaD) return;
+  E.naglowki = E.naglowki || {};
+  let c = Object.entries(E.naglowki).find(([, h]) => L.LC(L.vbaTrim(h.t || "")) === L.LC(nazwaD))?.[0];
+  if (!c) { c = Math.max(1, L.ostKolumna(E)) + 1; for (let k = 2; k <= L.ostKolumna(E); k++) if (!L.vbaTrim(E.naglowki[k]?.t || "")) { c = k; break; } E.naglowki[c] = { ...(E.naglowki[c] || {}), t: nazwaD }; }
+  let ile = 0;
+  r2.form.querySelectorAll("input[data-r]").forEach(i => { const v = i.value.trim(); if (!v) return; ustawKomorke(+i.dataset.r, +c, v); ile++; });
+  zmiana(); rysujArkusz(); toast(`Wpisano ${ile} cen – ${nazwaD}`);
+}
 async function zapytanieNaMagazyn() {
   const wyb = await wybierzZListy(); if (!wyb) return;
   const rok = L.rokNumeru(U), nr = L.nastepnyNumer(Z.map(z => z.nazwa), rok);
@@ -427,6 +500,7 @@ async function zapytanieNaMagazyn() {
 async function oknoMail(z) {
   const m = L.przygotujMail(z, U);
   if (m.blad) return okno(`<h3>Mail do dostawców</h3><p>${esc(m.blad)}</p>`);
+  if (z.typ === "trapez") m.tresc += "\n\nProszę o cenę netto za m² dla każdej budowy – z kodem budowy przy cenie.";
   const href = `mailto:${encodeURIComponent(m.do)}?bcc=${encodeURIComponent(m.udw)}&subject=${encodeURIComponent(m.temat)}&body=${encodeURIComponent(m.tresc.replace(/\n/g, "\r\n"))}`;
   await okno(`<h3>Mail: ${esc(z.nazwa)}</h3>
     <div class="small">Dostawcy idą w UDW – nie widzą się nawzajem. Przycisk otwiera nową wiadomość w domyślnym programie pocztowym (Thunderbird, jeśli jest domyślny).</div>
@@ -451,7 +525,7 @@ function renderLista() {
   const q = L.LC(listaQ);
   const lista = zapytaniaPosort().filter(z => !q || L.LC(z.nazwa + " " + z.kod + " " + z.wiersze.map(w => w.a).join(" ") + " " + Object.values(z.naglowki || {}).map(h => h.t).join(" ")).includes(q));
   M().innerHTML = `<div class="panel"><div class="hd"><div class="toolbar"><input id="lQ" type="search" placeholder="Przejdź do zapytania: numer, kod klienta, pozycja, dostawca…" style="width:340px" value="${esc(listaQ)}"></div>
-    <div class="toolbar"><button class="btn primary" id="lMag">Nowe zapytanie (lista / własne pozycje)</button><button class="btn" id="lNowe">+ Puste zapytanie (z wzoru)</button></div></div>
+    <div class="toolbar"><button class="btn primary" id="lMag">Nowe zapytanie (lista / własne pozycje)</button><button class="btn" id="lTrapez">Blacha trapezowa (budowy, cena za m²)</button><button class="btn" id="lNowe">+ Puste zapytanie (z wzoru)</button></div></div>
     <div class="lista">${lista.slice(0, 300).map(z => {
       const poz = z.wiersze.filter(w => L.vbaTrim(w.a)).length, dost = Object.values(z.naglowki || {}).filter(h => h.t).length, wyb = Object.values(z.naglowki || {}).filter(h => L.kolor(h.k) !== -1).length;
       const proj = L.projektDlaZapytania(P, z.nazwa);
@@ -464,6 +538,7 @@ function renderLista() {
   M().querySelector(".lista").onclick = e => { const it = e.target.closest(".it"); if (it) go("z", it.dataset.id); };
   $("lNowe").onclick = noweZWzoru;
   $("lMag").onclick = zapytanieNaMagazyn;
+  $("lTrapez").onclick = zapytanieTrapez;
 }
 async function noweZWzoru() {
   const rok = L.rokNumeru(U), nr = L.nastepnyNumer(Z.map(z => z.nazwa), rok);
@@ -503,6 +578,7 @@ function renderArkusz() {
         <button class="btn" id="aWaga">Waga dla logistyki</button>
         <button class="btn" id="aKoszt">Koszt projektu${proj ? "" : " (brak danych)"}</button>
         <button class="btn" id="aXls">Pobierz jako Excel</button>
+        <button class="btn" id="aOferta" title="Mail (.eml), PDF albo tekst oferty – ceny wpiszą się w kolumnę dostawcy">Wczytaj ofertę</button>
         <button class="btn" id="aKom" title="Pokaż treść komentarzy w komórkach">Pokaż komentarze</button>
         ${proj ? `<button class="btn" id="aProj" title="Pozycje liczone do kosztu projektu">Edytuj projekt</button>` : ""}
         ${isOwner ? `<button class="btn danger" id="aUsun">Usuń</button>` : ""}
@@ -520,6 +596,7 @@ function renderArkusz() {
   $("aWaga").onclick = async () => { await zapiszTeraz(); go("waga", eId); };
   $("aKoszt").onclick = async () => { await zapiszTeraz(); kosztDlaZapytania(zapById(eId)); };
   $("aXls").onclick = () => eksportArkusza(E);
+  $("aOferta").onclick = wczytajOferte;
   $("aProj") && ($("aProj").onclick = async () => { await zapiszTeraz(); const pr = L.projektDlaZapytania(P, E.nazwa); if (pr) edytujProjekt(pr, E.nazwa); });
   const komOn = v => { $("aBox").classList.toggle("komentarze", v); $("aKom").classList.toggle("on", v); $("aKom").textContent = v ? "Ukryj komentarze" : "Pokaż komentarze"; try { localStorage.setItem("zap_kom", v ? "1" : ""); } catch {} };
   let kom0 = false; try { kom0 = !!localStorage.getItem("zap_kom"); } catch {}
@@ -565,11 +642,13 @@ function bezEnterZapisu(f) { f.addEventListener("keydown", e => { if (e.key === 
 function stanDostawcy(c, n) {
   if (!L.vbaTrim(n.t || "")) return "";
   const k = L.kolor(n.k), btn = `<button type="button" class="kolBtn" data-kol="${c}" title="Kolor dostawcy – wybierz albo usuń" aria-label="kolor dostawcy" style="${k !== -1 ? `--k:${hex(k)}` : ""}"></button>`;
-  if (k === -1) return `<div class="zst">${btn}<span>bez koloru</span></div>`;
+  let suma = "";
+  if (E.typ === "trapez") { let s = 0; for (const w of E.wiersze) { const n = L.naLiczbe(w.c?.[c]?.v), m2 = OF.m2Wiersza(w.a); if (n.ok && m2) s += n.w * m2; } if (s) suma = `<span title="suma: cena za m² × m²">Σ ${fmt(s, 0)} zł</span>`; }
+  if (k === -1) return `<div class="zst">${btn}<span>bez koloru</span>${suma}</div>`;
   const ile = E.wiersze.filter(w => L.vbaTrim(w.a) && (L.kolor(w.k) === k || L.kolor(w.c?.[c]?.k) === k)).length;
   const z = (E.zamowienia || {})[k] || {}, kurs = z.kursId ? kursySub.get(z.kursId)?.dane : null;
   const [kl, t] = (kurs?.status === "Dostarczone" || z.status === "dostarczono") ? ["p-ok", "dostarczono"] : z.kursId ? ["p-acc", "w Logistyce"] : z.status === "zamowiono" ? ["p-warn", z.nr ? "zam. " + z.nr : "zamówiono"] : ["p-idle", "nie zamówiono"];
-  return `<div class="zst">${btn}<span>${ile} poz.</span><span class="pill ${kl}">${esc(t)}</span></div>`;
+  return `<div class="zst">${btn}<span>${ile} poz.</span>${suma}<span class="pill ${kl}">${esc(t)}</span></div>`;
 }
 const km = t => `<span class="km" title="${esc(t)}"></span><span class="kmT">${esc(t)}</span>`;
 let dodWiersze = 0;          // puste wiersze dołożone Enterem / strzałką na końcu arkusza
@@ -669,8 +748,8 @@ document.addEventListener("click", async e => {
     if (r.v !== "ok") return;
     Object.assign(z, { nr: r.form.nr.value.trim(), data: r.form.data.value, dostawa: r.form.dostawa.value, uwagi: r.form.uwagi.value.trim(), status: z.status === "dostarczono" ? "dostarczono" : "zamowiono" });
     E.zamowienia[k] = z; zmiana(); rysujZamowienia();
-    // pozycje zamówione u tego dostawcy, których nie ma w bazie cen – dopisują się z ceną z zamówienia
-    const doBazy = await dopiszDoBazy(g.pozycje.map(({ w }) => { const pk = ZM.pozycjaDoKursu(w.a), n = L.naLiczbe(w.c?.[g.c]?.v);
+    // pozycje zamówione u tego dostawcy, których nie ma w bazie cen – dopisują się z ceną z zamówienia (bez blachy trapezowej – cena za m² budowy)
+    const doBazy = E.typ === "trapez" ? 0 : await dopiszDoBazy(g.pozycje.map(({ w }) => { const pk = ZM.pozycjaDoKursu(w.a), n = L.naLiczbe(w.c?.[g.c]?.v);
       return { symbol: "", nazwa: pk.nazwa, cena: n.ok ? n.w : 0, jm: pk.jm, zrodlo: "zamowienie", data: z.data || today(), dostawca: z.dostawca, zapytanie: E.nazwa }; }));
     if (doBazy) toast(`Dopisano do bazy cen: ${doBazy} poz.`);
     return;

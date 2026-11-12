@@ -16,6 +16,7 @@ export const POMOC = {
       <li>Najnowsze na górze. Szukaj po numerze, kliencie, dostawcy albo nazwie pozycji; <b>Enter</b> otwiera pierwsze trafienie.</li>
       <li>Pod numerem: liczba pozycji, dostawców, wybrani dostawcy (kolor) i stan zamówień.</li>
       <li><b>Nowe zapytanie</b> – na magazyn albo dowolne pozycje bez eksportu z Subiekta.</li>
+      <li><b>Blacha trapezowa</b> – zapytanie, w którym wiersz to budowa (kod budowy, profil, grubość, powłoka, m²). Mail prosi dostawców o cenę za m² z kodem budowy.</li>
     </ul>`,
   },
   z: {
@@ -24,6 +25,7 @@ export const POMOC = {
       <li>Działa jak arkusz w Excelu: pozycje w kolumnie A, dostawcy w wierszu 1, ceny w komórkach. Strzałki, Tab i Enter przechodzą po komórkach; można wpisać działanie, np. <b>=2,93*4,25</b>.</li>
       <li>Najniższa cena w wierszu jest zielona, najwyższa czerwona.</li>
       <li><b>Wybór dostawcy</b>: kliknij nazwę dostawcy i nadaj mu kolor, potem zaznacz tym kolorem pozycje (całą kolumnę A albo pojedynczą komórkę). Opcje komórki (kolor, komentarz) są na pasku nad arkuszem.</li>
+      <li><b>Wczytaj ofertę</b> – zapisany mail (.eml), PDF albo wklejony tekst oferty: aplikacja rozpoznaje dostawcę, kody budów i ceny za m², pokazuje podgląd i wpisuje ceny w kolumnę dostawcy. W blasze trapezowej nad dostawcą widać sumę (cena × m²).</li>
       <li><b>Mail do dostawców</b> – temat i treść z Ustawień, adresy w UDW.</li>
       <li><b>Waga dla logistyki</b> – waga każdego dostawcy z tabeli WAGI. Gdy brakuje wymiaru, aplikacja pyta raz i zapamiętuje odpowiedź.</li>
       <li><b>Zamówienia</b> (pod arkuszem): po wyborze dostawcy wpisz numer ZD, potem <b>Utwórz dostawę w Logistyce</b> – biuro zobaczy ją jako „🛒 do uzupełnienia”. Status „dostarczono” wraca z Logistyki sam.</li>

@@ -201,6 +201,35 @@ try {
   await p.setInputFiles("#kpPrzywroc", plikKopii); await dlgOk(p);
   await p.waitForFunction(() => location.hash === "#zapytania", null, { timeout: 30000 }); await W(1500);
   ok("przywrócono z kopii", await ile("zap_zapytania") === 2);
+  // 6b. blacha trapezowa: zapytanie z budowami, oferta z maila (.eml) i z PDF
+  await p.click("#tabs [data-v=zapytania]"); await W(400); await p.click("#lTrapez"); await p.waitForSelector("#trRows");
+  const pola = async (n, v) => { const tr = (await p.$$("#trRows tr"))[n]; for (const [f, x] of Object.entries(v)) await (await tr.$(`[data-f="${f}"]`)).fill(x); };
+  await pola(0, { kod: "BUD-17/2026", profil: "T35", grubosc: "0,5", powloka: "RAL 7016", m2: "320" });
+  await pola(1, { kod: "BUD-21/2026", profil: "T18", grubosc: "0,5", powloka: "RAL 9002", m2: "150" });
+  await dlgOk(p); await p.waitForSelector("#dlg[open]"); await dlgOk(p, "tak"); await p.waitForSelector("#dlg[open]");
+  const mT = await txt(p, "#dlg");
+  ok("trapez: mail z budowami i prośbą o cenę za m²", mT.includes("BUD-17/2026 | Blacha trapezowa T35 0,5 mm RAL 7016- 320 m2") && mT.includes("cenę netto za m²"));
+  await dlgOk(p); await p.waitForSelector("#aGrid table"); await W(800);
+  const eml = join(TMP, "oferta.eml");
+  writeFileSync(eml, ["From: Biuro <oferty@stalpol.example>", "Subject: RE: zapytanie blacha", "Content-Type: text/plain; charset=utf-8", "", "Dzień dobry,", "BUD-17/2026 T35 0,5 RAL 7016 – 45,90 zł/m2 netto", "BUD-21/2026 – brak", ""].join("\r\n"));
+  await p.click("#aOferta"); await p.waitForSelector('#dlg input[name="plik"]'); await p.setInputFiles('#dlg input[name="plik"]', eml); await dlgOk(p);
+  await p.waitForSelector('#dlg input[name="dost"]'); const dE = await p.$eval('#dlg input[name="dost"]', e => e.value); await dlgOk(p); await W(1500);
+  const c22 = await p.$eval('#aGrid input[data-r="2"][data-c="2"]', e => e.value.replace(/ /g, " "));
+  ok("oferta z maila: dostawca i cena za m²", dE === "Stal-Pol" && c22 === "45,90 zł", dE + " | " + c22);
+  // prosty PDF z tekstem oferty
+  const linie = ["Hurt Metal sp. z o.o. - oferta", "BUD-17/2026 T35: 47,50 zl/m2", "BUD-21/2026 T18: 39,90 zl/m2"];
+  const strumien = "BT /F1 12 Tf 50 750 Td " + linie.map((l, i) => (i ? "0 -20 Td " : "") + "(" + l + ") Tj").join(" ") + " ET";
+  const obj = ["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>", "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+    `<< /Length ${strumien.length} >>\nstream\n${strumien}\nendstream`, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"];
+  let pdfS = "%PDF-1.4\n"; const off = []; obj.forEach((o, i) => { off.push(pdfS.length); pdfS += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+  const xref = pdfS.length; pdfS += `xref\n0 ${obj.length + 1}\n0000000000 65535 f \n` + off.map(o => String(o).padStart(10, "0") + " 00000 n \n").join("") + `trailer\n<< /Size ${obj.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  const pdfP = join(TMP, "oferta-hurt.pdf"); writeFileSync(pdfP, pdfS, "latin1");
+  await p.click("#aOferta"); await p.waitForSelector('#dlg input[name="plik"]'); await p.setInputFiles('#dlg input[name="plik"]', pdfP); await dlgOk(p);
+  await p.waitForSelector('#dlg input[name="dost"]', { timeout: 15000 }); const dP = await p.$eval('#dlg input[name="dost"]', e => e.value); await dlgOk(p); await W(1500);
+  const c33 = await p.$eval('#aGrid input[data-r="3"][data-c="3"]', e => e.value.replace(/ /g, " "));
+  const hdr = await txt(p, '#aGrid td.dost[data-c="3"]');
+  ok("oferta z PDF: dostawca, ceny i suma za m²", dP === "Hurt Metal" && c33 === "39,90 zł" && hdr.includes("Σ 21 185 zł"), `${dP} | ${c33} | ${hdr.replace(/\n/g, " ")}`);
+  await zrzut(p, "trapez");
   // 7. zastępstwo
   await p.click("#tabs [data-v=dostep]"); await W(800);
   await p.selectOption("#gKto", U.zastepca); const d = new Date(); d.setDate(d.getDate() + 5); await p.fill("#gDo", d.toISOString().slice(0, 10));
