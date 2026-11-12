@@ -147,6 +147,12 @@ try {
   await dlgOk(p); await p.waitForSelector("#dlg[open]"); await dlgOk(p, "tak"); await p.waitForSelector("#dlg[open]");
   ok("magazyn: mail z ręczną pozycją", (await txt(p, "#dlg")).includes("Wypałka trapez 240x80x5- 50 szt"));
   await dlgOk(p); await p.waitForSelector("#aGrid table"); await W(800);
+  // Enter w kolumnie A aż za ostatni pusty wiersz – arkusz rośnie, dalej da się pisać
+  { const n0 = await p.$$eval("#aGrid textarea", t => t.length);
+    await p.click('#aGrid textarea[data-r="3"]');
+    for (let i = 0; i < n0 + 1; i++) { await p.keyboard.type("Poz " + i); await p.keyboard.press("Enter"); }
+    await W(1500); const n1 = await p.$$eval("#aGrid textarea", t => t.length), akt = await p.evaluate(() => document.activeElement?.dataset?.r || "");
+    ok("Enter na końcu arkusza dokłada wiersze", n1 > n0 && +akt === n0 + 4, `wierszy ${n0} → ${n1}, kursor w wierszu ${akt}`); }
   ok("dwa zapytania, jeden projekt", await ile("zap_zapytania") === 2 && await ile("zap_projekty") === 1);
   // 5. pomoc
   await p.click("#btnPomoc"); await p.waitForSelector("#dlg[open]");
@@ -188,12 +194,17 @@ try {
   await p.click("#tabs [data-v=zapytania]"); await W(500); await p.fill("#lQ", `1-${rok}`); await p.keyboard.press("Enter"); await p.waitForSelector("#aGrid table");
   await p.click('#aGrid input[data-r="2"][data-c="2"]'); await p.keyboard.type("57"); await p.keyboard.press("Enter"); await W(1800);
   await zrzut(p, "arkusz-telefon");
+  // po Enter i zapisie (wpis w dzienniku wraca z bazy) dalej da się pisać w komórce niżej
+  await p.click('#aGrid input[data-r="2"][data-c="2"]'); await p.keyboard.type("57"); await p.keyboard.press("Enter"); await W(2500);
+  await p.keyboard.type("6,1"); await p.keyboard.press("Enter"); await W(1500);
+  const b3e = await p.$eval('#aGrid input[data-r="3"][data-c="2"]', e => e.value.replace(/\u00a0/g, " "));
+  ok("Enter: przejście w dół i dalsze pisanie po zapisie", b3e === "6,10 zł", b3e);
   const b2 = await p.$eval('#aGrid input[data-r="2"][data-c="2"]', e => e.value.replace(/\u00a0/g, " "));
   ok("wpisanie zastępuje cenę (jak w Excelu)", b2 === "57,00 zł", b2);
   ok("zastępca zapisał cenę", (await p.$eval("#aStatus", e => e.textContent)).includes("zapisano"));
   await p.click("#btnOut"); await p.close();
   p = await strona(); await zaloguj(p, "wlasciciel"); await W(1500);
-  ok("właściciel widzi zmianę zastępcy", (await p.$eval("#logCnt", e => e.hidden ? "" : e.textContent)) === "1");
+  ok("właściciel widzi zmianę zastępcy", +(await p.$eval("#logCnt", e => e.hidden ? "0" : e.textContent)) >= 1);
 } catch (e) { ok("przebieg testu", false, e.message.split("\n")[0]); }
 
 console.log(wyniki.join("\n"));

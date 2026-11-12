@@ -41,12 +41,24 @@ export function dostawcaTruck(nazwa, lista) {
   const L2 = (lista || []).filter(x => x && x.nazwa);
   return L2.find(x => n(x.nazwa) === k) || L2.find(x => n(x.nazwa).startsWith(k) || k.startsWith(n(x.nazwa))) || null;
 }
+// najdłuższy element [m] z nazw pozycji: „12m”, „L=4800”, profil „… 4800” (mm), blacha 1500x3000 (dłuższy bok); 0 gdy nie wiadomo
+export function najdluzszyElement(teksty) {
+  let max = 0;
+  for (const t0 of teksty) {
+    const t = pozycjaDoKursu(String(t0 || "")).nazwa;
+    let d = L.dlugoscZNazwy(t);
+    if (!d) { const w = wymiarProfilu(t); if (w?.dl) d = w.dl / 1000; }
+    if (!d) { const a = L.wymiarArkusza(L.UC(t)); if (a) d = Math.max(...a.split("x").map(Number).filter(n => n > 0)) / 1000; }
+    if (d > 0 && d <= 30) max = Math.max(max, d);
+  }
+  return max ? Math.round(max * 100) / 100 : 0;
+}
 // dokument kursu i kosztów w formacie Logistyki (POLA_KURSU z src/dane.js)
-export function kursLogistyki({ nr, proj, kontr, transport, zal, dst, wagaT, pozycje, uwagi, kto, nazwa, miejsce = "", oddzial = "", kontakt = "" }, czas) {
+export function kursLogistyki({ nr, proj, kontr, transport, zal, dst, wagaT, dlugosc = null, pozycje, uwagi, kto, nazwa, miejsce = "", oddzial = "", kontakt = "" }, czas) {
   const dataS = zal || dst || "9999-12-31";
   const kurs = {
     typ: "D", rodzaj: "Dostawa – materiał", nr, proj, kontr, transport, spedytor: "", kier: "", nasz: "", kierUid: "", auto: "",
-    zal: zal || "", dst: dst || "", waga: wagaT ?? null, dlugosc: null, oddzial, miejsce, kraj: "", kontakt,
+    zal: zal || "", dst: dst || "", waga: wagaT ?? null, dlugosc: dlugosc || null, oddzial, miejsce, kraj: "", kontakt,
     status: "Oczekuje na kierowcę", uwagi, uwagiMag: "", ladunek: null, awizo: null, zrodlo: "ZAPYTANIE", hlId: "", hlIndeks: "", hlWeek: "",
     hlTydzien: false, godz: "", dojazd: null, przew: null, oddzial2: "", waga2: null, planId: "", punkty: [], doUzup: true,
     odZakupow: { kto, nazwa, czas: Date.now() }, zalMiejsce: "", opoznienie: "", protokol: null, pozycje, kierStatus: "",

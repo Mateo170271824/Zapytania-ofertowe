@@ -87,6 +87,8 @@ function poZmianieDanych(co) {
   if (co === "z" && isOwner) sprzatnijProjekty();
   // nie przerysowuj arkusza, gdy ktoś w nim pisze
   if (widok.nazwa === "z" && co === "z") return odswiezArkuszZBazy();
+  if (widok.nazwa === "z" && co === "log") return rysujHistorie();      // wpis w dzienniku po zapisie – tylko historia, bez przerysowania arkusza
+  if (widok.nazwa === "z" && (eDirty || document.activeElement?.closest?.("table.ark, #cellbar"))) return;
   if (widok.nazwa === "generator" && co === "g" && genDirty) return;
   if (widok.nazwa === "ustawienia" && ["u", "w"].includes(co) && ustDirty) return;
   if (co === "c" && widok.nazwa !== "ceny") return;
@@ -483,6 +485,7 @@ function renderArkusz() {
   const z = zapById(widok.arg);
   if (!z) { M().innerHTML = zaladowane.z ? `<div class="empty"><strong>Nie ma takiego zapytania</strong><a class="btn" href="#zapytania">Lista zapytań</a></div>` : `<div class="empty">Wczytywanie…</div>`; return; }
   if (eId !== z._id || !eDirty) { E = clone(z); eId = z._id; eWersja = z.wersja || 0; }
+  dodWiersze = 0;
   const proj = L.projektDlaZapytania(P, z.nazwa);
   M().innerHTML = `
     <div class="panel"><div class="hd">
@@ -541,9 +544,10 @@ function stanDostawcy(c, n) {
   const [kl, t] = (kurs?.status === "Dostarczone" || z.status === "dostarczono") ? ["p-ok", "dostarczono"] : z.kursId ? ["p-acc", "w Logistyce"] : z.status === "zamowiono" ? ["p-warn", z.nr ? "zam. " + z.nr : "zamówiono"] : ["p-idle", "nie zamówiono"];
   return `<div class="zst"><span>${ile} poz.</span><span class="pill ${kl}">${esc(t)}</span></div>`;
 }
+let dodWiersze = 0;          // puste wiersze dołożone Enterem / strzałką na końcu arkusza
 function rysujArkusz() {
   const g = $("aGrid"); if (!g || !E) return;
-  const ostK = Math.max(L.ostKolumna(E), 4), nW = Math.max(E.wiersze.length + 3, 6);
+  const ostK = Math.max(L.ostKolumna(E), 4), nW = Math.max(E.wiersze.length + 3, 6) + dodWiersze;
   const naglowki = E.naglowki || {};
   // szerokość kolumny dopasowana do najdłuższego tekstu (nagłówek albo komórka), 160–320 px
   const tel = innerWidth < 700;      // na telefonie wąska kolumna A (zawija tekst), żeby było widać ceny
@@ -693,7 +697,7 @@ document.addEventListener("click", async e => {
       <p class="small">Powstanie dostawa oznaczona „🛒 do uzupełnienia” – biuro w Logistyce uzupełni transport i awizo, jak przy dostawach z Kooperacji.</p>
       <div class="grid3"><label>Dostawca<input name="kontr" value="${esc(z.dostawca)}" required></label><label>Nr (zamówienia)<input name="nr" value="${esc(z.nr || E.nazwa)}" required></label><label>Projekt / kod<input name="proj" value="${esc(E.kod || "")}"></label>
       <label>Transport<select name="tr"><option value="Dostawca">transport dostawcy</option><option value="Spedycja">spedycja</option><option value="Skavska">nasz transport</option></select></label>
-      <label>Załadunek (data)<input name="zal" type="date" value="${esc(z.dostawa || "")}"></label><label>Waga [t]<input name="waga" inputmode="decimal" value="${wT === "" ? "" : L.ogolny(wT)}"></label>
+      <label>Załadunek (data)<input name="zal" type="date" value="${esc(z.dostawa || "")}"></label><label>Waga [t]<input name="waga" inputmode="decimal" value="${wT === "" ? "" : L.ogolny(wT)}"></label><label>Najdłuższy element [m]<input name="dl" inputmode="decimal" value="${(dlE => dlE ? L.ogolny(dlE) : "")(ZM.najdluzszyElement(g.pozycje.map(p => p.w.a)))}" placeholder="np. 12"></label>
       <label class="full">Adres załadunku (u dostawcy)<input name="miejsce" value="${esc(dT?.adres || "")}" placeholder="ulica, kod, miasto" list="zapAdresy" autocomplete="off"><datalist id="zapAdresy">${listaT.filter(x => x.adres).map(x => `<option value="${esc(x.adres)}">${esc(x.nazwa)}</option>`).join("")}</datalist></label>
       <label>Dostawa do oddziału<select name="oddzial">${oddz.map(o => `<option ${o.nazwa === oddzOst ? "selected" : ""}>${esc(o.nazwa)}</option>`).join("")}</select></label>
       <div class="small full" style="align-self:end">${dT?.adres ? `Adres z listy dostawców Truck App (${esc(dT.nazwa)}).` : "Tego dostawcy nie ma z adresem na liście Truck App – wpisz adres albo zostaw puste (uzupełni biuro)."}</div>
@@ -702,7 +706,7 @@ document.addEventListener("click", async e => {
     if (r.v !== "ok") return;
     await zapiszTeraz();
     const f = r.form, wg = L.naLiczbe(f.waga.value);
-    const { kurs, koszt } = ZM.kursLogistyki({ nr: f.nr.value.trim(), proj: f.proj.value.trim(), kontr: f.kontr.value.trim(), transport: f.tr.value, zal: f.zal.value, dst: "", wagaT: wg.ok ? wg.w : null,
+    const { kurs, koszt } = ZM.kursLogistyki({ nr: f.nr.value.trim(), proj: f.proj.value.trim(), kontr: f.kontr.value.trim(), transport: f.tr.value, zal: f.zal.value, dst: "", wagaT: wg.ok ? wg.w : null, dlugosc: (n => n.ok && n.w > 0 ? n.w : null)(L.naLiczbe(f.dl.value)),
       pozycje: g.pozycje.map(p => ZM.pozycjaDoKursu(p.w.a)), uwagi: f.uwagi.value.trim(), kto: user.login || me.nazwa, nazwa: me.nazwa,
       miejsce: f.miejsce.value.trim(), oddzial: f.oddzial.value, kontakt: dT?.tel || "" }, B.now());
     try { localStorage.setItem("zap_oddzial", f.oddzial.value); } catch {}
@@ -831,7 +835,12 @@ document.addEventListener("keydown", e => {
   if (cel) {
     e.preventDefault();
     const cel2 = $("aGrid")?.querySelector(`[data-r="${cel[0]}"][data-c="${cel[1]}"]:is(input,textarea)`);
-    if (cel2) { cel2.focus(); cel2.select?.(); } else el.blur();     // od razu – żeby nie zgubić znaków przy szybkim pisaniu
+    if (cel2) { cel2.focus(); cel2.select?.(); }     // od razu – żeby nie zgubić znaków przy szybkim pisaniu
+    else if (cel[0] > r && cel[0] >= 2) {
+      // koniec narysowanych wierszy: jak w Excelu – arkusz rośnie, kursor idzie niżej
+      el.blur(); dodWiersze += 5; rysujArkusz();
+      const n = $("aGrid")?.querySelector(`[data-r="${cel[0]}"][data-c="${cel[1]}"]:is(input,textarea)`); if (n) { n.focus(); n.select?.(); }
+    } else el.blur();
   }
 });
 function odswiezWiersz(r) {
