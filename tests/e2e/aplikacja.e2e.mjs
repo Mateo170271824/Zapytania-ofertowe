@@ -110,6 +110,8 @@ try {
   ok("formuła =2,5*2 → 5,00 zł", b3 === "5,00 zł", b3);
   await p.click("#aWybor"); await p.click('#aGrid td[data-r="2"][data-c="3"]'); await p.click('#aGrid td[data-r="3"][data-c="3"]'); await p.click('#aGrid td[data-r="4"][data-c="3"]'); await W(300); await p.click("#aWybor"); await W(1800);
   ok("historia arkusza", (await txt(p, "#aLog")).includes("wybór dostawcy"));
+  { const zw = await p.$eval("#aLog", e => getComputedStyle(e).display === "none"); await p.click("#aHistHd"); const ot = await p.$eval("#aLog", e => getComputedStyle(e).display !== "none"); await p.click("#aHistHd");
+    ok("historia zmian zwijana (domyślnie zwinięta)", zw && ot); }
   // kolor dostawcy z przycisku w nagłówku (bez trybu wyboru): nadanie i usunięcie
   await p.click('#aGrid [data-kol="2"]'); await p.waitForSelector("#dlg[open] [data-p]"); await p.click('#dlg [data-p="FFC000"]'); await W(600);
   const kSP = await p.$eval('#aGrid td.dost[data-c="2"]', e => e.classList.contains("kol"));

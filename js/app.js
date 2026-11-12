@@ -589,7 +589,7 @@ function renderArkusz() {
     </div>
     <div id="aBox"><div class="arkuszbox" id="aGrid"></div></div>
     <div class="panel" id="aZam"></div>
-    <div class="panel"><div class="hd"><h3>Historia zmian</h3></div><div class="log" id="aLog"></div></div>`;
+    <div class="panel hist" id="aHist"><div class="hd" id="aHistHd" role="button" tabindex="0" aria-expanded="false" title="Pokaż / zwiń historię zmian"><h3><span class="strz">▸</span> Historia zmian <span class="small" id="aHistIle"></span></h3></div><div class="log" id="aLog"></div></div>`;
   $("aWybor").onclick = () => { wybor = !wybor; $("aWybor").classList.toggle("on", wybor); $("aBox").classList.toggle("wybor", wybor); $("aWyborInfo").hidden = !wybor; $("cellbar").hidden = true; };
   $("aWybor").classList.toggle("on", wybor); $("aBox").classList.toggle("wybor", wybor); $("aWyborInfo").hidden = !wybor;
   $("aMail").onclick = async () => { await zapiszTeraz(); oknoMail(zapById(eId)); };
@@ -597,6 +597,11 @@ function renderArkusz() {
   $("aKoszt").onclick = async () => { await zapiszTeraz(); kosztDlaZapytania(zapById(eId)); };
   $("aXls").onclick = () => eksportArkusza(E);
   $("aOferta").onclick = wczytajOferte;
+  // historia zmian zwijana (domyślnie zwinięta, pamiętane na tym urządzeniu)
+  const histOn = v => { $("aHist").classList.toggle("otw", v); $("aHistHd").setAttribute("aria-expanded", v); try { localStorage.setItem("zap_hist", v ? "1" : ""); } catch {} };
+  let h0 = false; try { h0 = !!localStorage.getItem("zap_hist"); } catch {}
+  histOn(h0); $("aHistHd").onclick = () => histOn(!$("aHist").classList.contains("otw"));
+  $("aHistHd").onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); histOn(!$("aHist").classList.contains("otw")); } };
   $("aProj") && ($("aProj").onclick = async () => { await zapiszTeraz(); const pr = L.projektDlaZapytania(P, E.nazwa); if (pr) edytujProjekt(pr, E.nazwa); });
   const komOn = v => { $("aBox").classList.toggle("komentarze", v); $("aKom").classList.toggle("on", v); $("aKom").textContent = v ? "Ukryj komentarze" : "Pokaż komentarze"; try { localStorage.setItem("zap_kom", v ? "1" : ""); } catch {} };
   let kom0 = false; try { kom0 = !!localStorage.getItem("zap_kom"); } catch {}
@@ -627,6 +632,7 @@ function rysujHistorie() {
   const el = $("aLog"); if (!el) return;
   const l = LOG.filter(x => x.obiektId === eId || (x.typ === "zapytanie" && String(x.obiekt).split(", ").includes(E?.nazwa)));
   el.innerHTML = l.length ? l.slice(0, 60).map(logItem).join("") : `<div class="empty"><span>Brak wpisów</span></div>`;
+  if ($("aHistIle")) $("aHistIle").textContent = l.length ? `(${l.length}${l.length > 60 ? ", ostatnie 60" : ""})` : "";
 }
 function wartWyswietl(c, kol) {
   if (!c) return "";

@@ -319,3 +319,10 @@ table.ark .kmT{display:none}
 table.ark .tagP,table.ark .tagM{display:block;margin:2px auto 0;width:16px;border-radius:4px;font:700 9.5px/14px var(--f-mono);text-align:center}
 table.ark .tagP{background:var(--accent);color:var(--accent-fg)}
 table.ark .tagM{background:var(--sunk);color:var(--muted);border:1px solid var(--line)}
+/* historia zmian zwijana */
+.panel.hist .hd{cursor:pointer;user-select:none}
+.panel.hist .hd:hover h3{color:var(--accent)}
+.panel.hist .strz{display:inline-block;transition:transform .15s;color:var(--muted)}
+.panel.hist.otw .strz{transform:rotate(90deg)}
+.panel.hist:not(.otw) #aLog{display:none}
+.panel.hist:not(.otw) .hd{border-bottom:0}
