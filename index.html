@@ -9,6 +9,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="js/instaluj.js" data-nazwa="Zapytania ofertowe" data-apk="https://github.com/Mateo170271824/Zapytania-ofertowe/releases/latest/download/Zapytania-ofertowe.apk"></script>
 <script>window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.zapInstalacja=e;document.dispatchEvent(new Event("zap-instalacja"))});</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -51,13 +52,14 @@
     <div class="err" id="lgErr" hidden></div>
     <button class="btn primary" type="submit">Zaloguj</button>
   </form>
+  <p style="text-align:center;margin:10px 0 0"><button class="btn sm" type="button" data-instaluj hidden title="Zainstaluj na telefonie albo komputerze">📲 Zainstaluj</button></p>
   <div class="sf-podpis">część systemu <b>SteelFlow</b><span class="sf-mk">made by <svg viewBox="0 0 96 110" aria-hidden="true"><path d="M14 14h66v16H56v50h24v16H14V80h24V30H14z"/></svg><b>M.K.</b></span></div>
 </div>
 
 <div id="v-app" class="wrap" hidden>
   <header class="top">
     <div><h1>Zapytania ofertowe</h1><p class="sub" id="hSub"></p></div>
-    <div class="who"><span id="whoName"></span><span id="whoRole"></span><button class="btn sm" id="btnPomoc" title="Jak działa ta zakładka">Pomoc</button><button class="btn sm" id="btnOut">Wyloguj</button></div>
+    <div class="who"><span id="whoName"></span><span id="whoRole"></span><button class="btn sm" id="btnPomoc" title="Jak działa ta zakładka">Pomoc</button><button class="btn sm" type="button" data-instaluj hidden title="Zainstaluj na telefonie albo komputerze">📲 Zainstaluj</button><button class="btn sm" id="btnOut">Wyloguj</button></div>
   </header>
   <div id="zastBanner" class="notice" hidden></div>
   <nav class="tabs" id="tabs">
