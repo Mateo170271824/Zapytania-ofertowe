@@ -177,6 +177,9 @@ try {
     ok("Enter na końcu arkusza dokłada wiersze", n1 > n0 && +akt === n0 + 4, `wierszy ${n0} → ${n1}, kursor w wierszu ${akt}`); }
   ok("dwa zapytania, jeden projekt", await ile("zap_zapytania") === 2 && await ile("zap_projekty") === 1);
   // 5. pomoc
+  { const wid = await p.isVisible("#btnEkran"); await p.click("#btnEkran"); await W(500); const t1 = await txt(p, "#btnEkran"), fs1 = await p.evaluate(() => !!document.fullscreenElement);
+    await p.click("#btnEkran"); await W(500); const fs2 = await p.evaluate(() => !!document.fullscreenElement);
+    ok("przycisk Pełny ekran (włącz / wyłącz)", wid && fs1 && t1.includes("Zamknij") && !fs2, `${t1} | ${fs1} → ${fs2}`); }
   await p.click("#btnPomoc"); await p.waitForSelector("#dlg[open]");
   ok("pomoc dla arkusza", (await txt(p, "#dlg")).includes("Arkusz zapytania"));
   await dlgOk(p);

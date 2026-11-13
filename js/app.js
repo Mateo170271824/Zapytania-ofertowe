@@ -39,6 +39,17 @@ $("loginF").addEventListener("submit", async e => {
   try { await B.login($("lgLogin").value, $("lgPass").value); } catch (x) { $("lgErr").hidden = false; $("lgErr").textContent = komunikat(x); }
 });
 $("btnOut").onclick = () => B.logout();
+// pełny ekran (bez paska przeglądarki); niewidoczny, gdy przeglądarka nie pozwala albo aplikacja jest zainstalowana
+{
+  const b = $("btnEkran"), d = document, wObrebie = () => !!(d.fullscreenElement || d.webkitFullscreenElement);
+  const zainst = matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches;
+  if (b && (d.fullscreenEnabled || d.webkitFullscreenEnabled) && !zainst) {
+    b.hidden = false;
+    const opis = () => { b.textContent = wObrebie() ? "⛶ Zamknij pełny ekran" : "⛶ Pełny ekran"; };
+    b.onclick = async () => { try { if (wObrebie()) await (d.exitFullscreen || d.webkitExitFullscreen).call(d); else await (d.documentElement.requestFullscreen || d.documentElement.webkitRequestFullscreen).call(d.documentElement); } catch { toast("Przeglądarka nie pozwoliła na pełny ekran – spróbuj F11"); } };
+    d.addEventListener("fullscreenchange", opis); d.addEventListener("webkitfullscreenchange", opis);
+  }
+}
 $("btnPomoc").onclick = () => okno(trescPomocy(widok.nazwa, isOwner), [{ v: "ok", t: "Zamknij", cls: "primary" }], { szer: "min(720px, 96vw)" });
 export function stopAll() { subs.forEach(u => { try { u(); } catch {} }); subs = []; started = false; }
 export function decide() {
