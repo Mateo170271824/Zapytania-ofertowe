@@ -5,7 +5,7 @@ export { firebaseConfig, komunikat };
 export const C = { z: "zap_zapytania", p: "zap_projekty", log: "zap_dziennik", u: "zap_ustawienia", c: "zap_ceny" };
 export async function firebase() {
   const sdk = await zaladujSDK(), A = sdk.auth, F = sdk.firestore;
-  const { auth, db } = polacz(sdk, { emuPort: 8085 });
+  const { auth, db } = polacz(sdk, { emuPort: 8085, offline: true });   // dane w urządzeniu – przeglądanie bez internetu
   const wrapT = T => ({
     get: async (c, id) => { const s = await T.get(F.doc(db, c, id)); return s.exists() ? s.data() : null; },
     set: (c, id, d) => T.set(F.doc(db, c, id), d),
@@ -27,6 +27,7 @@ export async function firebase() {
       const { lista, zmiany } = fn(s.data().dostawcy || []); if (zmiany) T.update(r, { dostawcy: lista }); return zmiany; }),
     newId: c => F.doc(F.collection(db, c)).id,
     now: () => F.serverTimestamp(),
+    inc: n => F.increment(n),
   };
 }
 
