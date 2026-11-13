@@ -158,7 +158,7 @@ export async function renderKoszt() {
     ${p.pozycje.map(x => `<tr><td>${esc(p.id)}</td><td>${esc(p.kod)}</td><td>${fD(p.data)}</td><td class="mono">${esc(x.symbol)}</td><td>${esc(x.nazwa)}</td><td>${esc(x.jm)}</td><td class="num">${L.ogolny(x.ilosc)}</td><td class="num">${L.ogolny(x.niez)}</td><td class="num">${L.ogolny(x.nazd)}</td><td class="num">${x.cz !== undefined ? L.ogolny(x.cz) : ""}</td><td>${esc(x.zapytano)}</td><td>${esc(x.ark)}</td><td>${esc(x.tresc)}</td></tr>`).join("")}</tbody></table></div></details>`;
   $("kEdytuj").onclick = () => edytujProjekt(p);
   $("kPdf").onclick = async () => {
-    try { const pdf = await import("./pdf.js?v=202611121300"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
+    try { const pdf = await import("../pdf.js?v=202611121300"); const { blob, nazwa } = await pdf.kosztPDF(ostatniKoszt); pobierzPlik(nazwa, blob); }
     catch (x) { console.error(x); toast("Nie udało się zrobić PDF: " + (x.message || x)); }
   };
 }

@@ -62,8 +62,8 @@ const FB = join(REPO, "node_modules/firebase/");
 const b = await chromium.launch();
 const bledy = [], wyniki = [];
 const ok = (n, v, extra = "") => wyniki.push((v ? "OK    " : "BŁĄD  ") + n + (extra ? "  → " + extra : ""));
-async function strona(szer = 1366) {
-  const ctx = await b.newContext({ viewport: { width: szer, height: 900 }, acceptDownloads: true });
+async function strona(szer = 1366, urz = null) {
+  const ctx = await b.newContext(urz ? { ...urz, acceptDownloads: true } : { viewport: { width: szer, height: 900 }, acceptDownloads: true });
   if (existsSync(FB + "firebase-app.js")) await ctx.route(/gstatic\.com\/firebasejs\/10\.12\.2\/(.*)$/, r => r.fulfill({ path: FB + r.request().url().split("/").pop(), contentType: "application/javascript" }));
   const p = await ctx.newPage();
   p.on("pageerror", e => bledy.push("PAGEERR " + e.message));
@@ -263,6 +263,11 @@ try {
   await p.click("#btnOut"); await p.close();
   p = await strona(); await zaloguj(p, "wlasciciel"); await W(1500);
   ok("właściciel widzi zmianę zastępcy", +(await p.$eval("#logCnt", e => e.hidden ? "0" : e.textContent)) >= 1);
+  // telefon (dotyk): koszt materiału do PDF
+  await p.close(); p = await strona(0, (require("playwright").devices)["Pixel 7"]); await zaloguj(p, "wlasciciel");
+  await p.click("#tabs [data-v=projekty]"); await p.waitForSelector("tr[data-id]"); await p.click("tr[data-id]"); await p.waitForSelector("#kPdf", { timeout: 20000 });
+  const plikPdf = await Promise.all([p.waitForEvent("download", { timeout: 30000 }), p.click("#kPdf")]).then(([d]) => d.suggestedFilename(), e => "brak: " + e.message.split("\n")[0]);
+  ok("telefon: koszt materiału do PDF", /\.pdf$/i.test(plikPdf), plikPdf);
   // 7b. łączenie zmian: ktoś zapisał w trakcie mojej edycji – inne pole → połączone; ta sama komórka → pytanie z adresem
   const zapDok = async () => { let r; await baza(async db => { r = (await getDocs(collection(db, "zap_zapytania"))).docs.map(x => ({ _id: x.id, ...x.data() })).find(z => z.nazwa === `1-${rok}`); }); return r; };
   const ich = async zm => { const z = await zapDok(); const { _id, ...d } = z; zm(d); d.wersja = (z.wersja || 0) + 1; d.zmienilNazwa = "Zastępca"; await baza(db => setDoc(doc(db, "zap_zapytania", _id), d)); };

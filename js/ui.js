@@ -49,10 +49,35 @@ async function udostepnij(nazwa, blob) {
   await Share.share({ title: nazwa, files: [plik.uri], dialogTitle: "Zapisz lub wyślij plik" });
 }
 export function zapiszXlsx(wb, nazwa) {
-  if (!natywna()) return globalThis.XLSX.writeFile(wb, nazwa);
+  if (!natywna() && !telefon()) return globalThis.XLSX.writeFile(wb, nazwa);
   pobierzPlik(nazwa, new Blob([globalThis.XLSX.write(wb, { type: "array", bookType: "xlsx" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
 }
-export function pobierzPlik(nazwa, blob) {
-  if (natywna()) return udostepnij(nazwa, blob).catch(e => { if (!/cancel/i.test(e?.message || "")) toast("Nie udało się zapisać pliku: " + (e?.message || e)); }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nazwa; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); }
+// telefon / tablet (dotyk) – pobieranie przez link bywa tam zawodne, lepsze jest okno „Udostępnij”
+export const telefon = () => matchMedia("(pointer: coarse)").matches && !matchMedia("(pointer: fine)").matches;
+function pobierzLinkiem(nazwa, blob) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nazwa; document.body.append(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 120000);      // telefon potrzebuje chwili, zanim zacznie pobierać
+}
+async function udostepnijWebem(nazwa, blob) {
+  const plik = new File([blob], nazwa, { type: blob.type || "application/octet-stream" });
+  if (!navigator.canShare?.({ files: [plik] })) return false;
+  await navigator.share({ files: [plik], title: nazwa });
+  return true;
+}
+export async function pobierzPlik(nazwa, blob) {
+  if (natywna()) return udostepnij(nazwa, blob).catch(e => { if (!/cancel/i.test(e?.message || "")) toast("Nie udało się zapisać pliku: " + (e?.message || e)); });
+  if (!telefon()) return pobierzLinkiem(nazwa, blob);
+  try { if (await udostepnijWebem(nazwa, blob)) return; }
+  catch (e) {
+    if (e?.name === "AbortError") return;                                       // anulowane w oknie Udostępnij
+    if (e?.name === "NotAllowedError") {                                        // za długo od kliknięcia – potrzebne nowe kliknięcie
+      const r = await okno(`<h3>Plik gotowy</h3><p><b>${esc(nazwa)}</b></p><p class="small">Zapisz w telefonie albo wyślij (mail, WhatsApp, Dysk…).</p>`,
+        [{ v: "cancel", t: "Zamknij", nv: true }, { v: "pobierz", t: "Pobierz" }, { v: "ok", t: "Zapisz / udostępnij", cls: "primary" }]);
+      if (r.v === "ok") { try { if (await udostepnijWebem(nazwa, blob)) return; } catch (x) { if (x?.name === "AbortError") return; } }
+      if (r.v === "cancel") return;
+    }
+  }
+  pobierzLinkiem(nazwa, blob);
+}
 export const czytajPlik = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsArrayBuffer(f); });
 
