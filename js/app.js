@@ -1,5 +1,5 @@
 import * as L from "./logika.js?v=202611121300";
-import { $, esc, iso, toD, fD, clone, kolLit, show, msg, okno } from "./ui.js?v=202611121300";
+import { $, esc, iso, toD, fD, clone, kolLit, show, msg, okno, toast } from "./ui.js?v=202611121300";
 import { C, firebase } from "./baza.js?v=202611121300";
 import { zastStatus as zastS, zastDoDnia, komunikat } from "./steelflow-konto.js?v=202611121300";
 import { trescPomocy, START_ZASTEPCY } from "./pomoc.js?v=202611121300";
@@ -115,20 +115,43 @@ export function czysc(o) {
   }
   return o;
 }
-export async function zapiszDok(col, id, data, { typ, etykieta, diffFn, wersja, force, akcja }) {
+export async function zapiszDok(col, id, data, { typ, etykieta, diffFn, wersja, force, akcja, baza }) {
   const rid = id || B.newId(col), logId = B.newId(C.log);
+  if (navigator.onLine === false) return zapiszDokOffline(col, rid, id, data, { typ, etykieta, diffFn, akcja, baza, logId });
+  let scalono = null;
   return B.tx(async t => {
     const cur = id ? await t.get(col, rid) : null;
     if (id && !cur) return { gone: true };
-    if (cur && !force && (cur.wersja || 0) !== (wersja || 0)) return { conflict: cur };
+    if (cur && !force && (cur.wersja || 0) !== (wersja || 0)) {
+      // ktoś zapisał w międzyczasie – łączymy zmiany różnych komórek; ta sama komórka = pytanie
+      if (!baza) return { conflict: cur };
+      const czesci = {}; for (const k of Object.keys(data)) czesci[k] = cur[k];
+      const s = L.scal3(Object.fromEntries(Object.keys(data).map(k => [k, baza[k]])), czesci, data);
+      if (s.konflikty.length) return { conflict: cur, konflikty: s.konflikty };
+      data = s.wynik; scalono = cur.zmienilNazwa || "ktoś";
+    }
     const zmiany = diffFn(cur, data);
     if (cur && !zmiany.length) return { nochange: true, id: rid, wersja: cur.wersja };
     const meta = { zmieniono: B.now(), zmienil: me.uid, zmienilNazwa: me.nazwa, wersja: (cur?.wersja || 0) + 1, ostatniWpis: logId };
     if (cur) t.set(col, rid, czysc({ ...cur, ...data, ...meta }));
     else t.set(col, rid, czysc({ ...data, ...meta, utworzono: B.now(), utworzyl: me.uid }));
     t.set(C.log, logId, wpis(typ, rid, etykieta, akcja || (cur ? "zmiana" : "utworzenie"), zmiany));
-    return { ok: true, id: rid, wersja: meta.wersja };
-  });
+    return { ok: true, id: rid, wersja: meta.wersja, scalono, dane: data };
+  }).catch(x => { if (x && (x.code === "unavailable" || x.code === "deadline-exceeded")) return zapiszDokOffline(col, rid, id, data, { typ, etykieta, diffFn, akcja, baza, logId }); throw x; });
+}
+// Bez internetu: zapis do pamięci urządzenia (wysyła się sam po powrocie sieci) – tylko zmienione pola,
+// żeby po wysłaniu nie nadpisać cudzych zmian w innych polach.
+function zapiszDokOffline(col, rid, id, data, { typ, etykieta, diffFn, akcja, baza, logId }) {
+  const cur = id ? (baza || (col === C.z ? zapById(id) : null)) : null;
+  const zmiany = diffFn(cur, data);
+  if (cur && !zmiany.length) return { nochange: true, id: rid, wersja: cur.wersja };
+  const meta = { zmieniono: B.now(), zmienil: me.uid, zmienilNazwa: me.nazwa, wersja: B.inc(1), ostatniWpis: logId };
+  const pola = {}; for (const k of Object.keys(data)) if (!cur || JSON.stringify(cur[k] ?? null) !== JSON.stringify(data[k] ?? null)) pola[k] = data[k];
+  B.batch([
+    cur ? { c: col, id: rid, d: czysc({ ...pola, ...meta }), upd: true } : { c: col, id: rid, d: czysc({ ...data, ...meta, wersja: 1, utworzono: B.now(), utworzyl: me.uid }) },
+    { c: C.log, id: logId, d: wpis(typ, rid, etykieta, akcja || (cur ? "zmiana" : "utworzenie"), zmiany) }
+  ]).catch(x => { console.warn(x); toast("Zmiana zapisana bez internetu nie przeszła po połączeniu: " + (x?.code || x)); });
+  return { ok: true, offline: true, id: rid, wersja: (cur?.wersja || 0) + 1, dane: data };
 }
 export async function zapiszUst(docId, data, etykieta, zmiany, akcja = "zmiana") {
   const logId = B.newId(C.log);

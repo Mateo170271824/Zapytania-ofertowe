@@ -27,6 +27,7 @@ export async function firebase() {
       const { lista, zmiany } = fn(s.data().dostawcy || []); if (zmiany) T.update(r, { dostawcy: lista }); return zmiany; }),
     newId: c => F.doc(F.collection(db, c)).id,
     now: () => F.serverTimestamp(),
+    inc: n => F.increment(n),
   };
 }
 

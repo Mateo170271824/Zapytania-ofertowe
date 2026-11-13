@@ -260,6 +260,21 @@ try {
   await p.click("#btnOut"); await p.close();
   p = await strona(); await zaloguj(p, "wlasciciel"); await W(1500);
   ok("właściciel widzi zmianę zastępcy", +(await p.$eval("#logCnt", e => e.hidden ? "0" : e.textContent)) >= 1);
+  // 7b. łączenie zmian: ktoś zapisał w trakcie mojej edycji – inne pole → połączone; ta sama komórka → pytanie z adresem
+  const zapDok = async () => { let r; await baza(async db => { r = (await getDocs(collection(db, "zap_zapytania"))).docs.map(x => ({ _id: x.id, ...x.data() })).find(z => z.nazwa === `1-${rok}`); }); return r; };
+  const ich = async zm => { const z = await zapDok(); const { _id, ...d } = z; zm(d); d.wersja = (z.wersja || 0) + 1; d.zmienilNazwa = "Zastępca"; await baza(db => setDoc(doc(db, "zap_zapytania", _id), d)); };
+  await p.click("#tabs [data-v=zapytania]"); await W(500); await p.fill("#lQ", `1-${rok}`); await p.keyboard.press("Enter"); await p.waitForSelector("#aGrid table"); await W(800);
+  await p.click('#aGrid input[data-r="3"][data-c="3"]'); await p.keyboard.type("9,99");
+  await ich(d => { d.kodM = "komentarz od zastępcy"; }); await W(1000);
+  await p.keyboard.press("Enter"); await W(3000);
+  let zd = await zapDok();
+  ok("łączenie: moja komórka + ich komentarz zapisane razem", zd.kodM === "komentarz od zastępcy" && /9[.,]99/.test(JSON.stringify(zd.wiersze[1]?.c?.[3] ?? "")), JSON.stringify({ kodM: zd.kodM, c: zd.wiersze[1]?.c?.[3] }));
+  await p.click('#aGrid input[data-r="3"][data-c="3"]'); await p.keyboard.type("1,11");
+  await ich(d => { d.wiersze[1].c = d.wiersze[1].c || {}; d.wiersze[1].c[3] = { ...(d.wiersze[1].c[3] || {}), v: 2.22 }; }); await W(1000);
+  await p.keyboard.press("Enter"); await p.waitForSelector("#dlg[open]", { timeout: 8000 }).catch(() => {});
+  const tk = await txt(p, "#dlg").catch(() => "");
+  ok("łączenie: ta sama komórka – pytanie z adresem komórki (C3)", /Oboje zmieniliście/.test(tk) && /C3/.test(tk), tk.replace(/\s+/g, " ").slice(0, 160));
+  await p.click("#dlg button[value=\"wczytaj\"]").catch(() => {}); await W(800);
 } catch (e) { ok("przebieg testu", false, e.message.split("\n")[0]); }
 
 console.log(wyniki.join("\n"));

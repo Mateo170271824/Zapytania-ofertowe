@@ -13,18 +13,19 @@ import { edytujProjekt, kosztDlaZapytania, pozycjaProjektu, zapiszProjekt } from
 import { oknoMail } from './lista.js?v=202611121300';
 
 /* ============================================================ arkusz zapytania */
+export let eBaza = null;   // zapytanie przy wczytaniu (do łączenia zmian)
 export let E = null, eId = null, eWersja = 0, eDirty = false, eTimer = null, eZapis = null, wybor = false, fokus = null;
 export function odswiezArkuszZBazy() {
   const z = zapById(widok.arg);
   if (!z) return render();
   if (z._id !== eId) return render();
-  if ((z.wersja || 0) !== eWersja && !eDirty && !document.activeElement?.closest?.("table.ark")) { E = clone(z); eWersja = z.wersja || 0; rysujArkusz(); }
+  if ((z.wersja || 0) !== eWersja && !eDirty && !document.activeElement?.closest?.("table.ark")) { E = clone(z); eBaza = clone(z); eWersja = z.wersja || 0; rysujArkusz(); }
   else if (widok.nazwa === "z") rysujHistorie();
 }
 export function renderArkusz() {
   const z = zapById(widok.arg);
   if (!z) { M().innerHTML = zaladowane.z ? `<div class="empty"><strong>Nie ma takiego zapytania</strong><a class="btn" href="#zapytania">Lista zapytań</a></div>` : `<div class="empty">Wczytywanie…</div>`; return; }
-  if (eId !== z._id || !eDirty) { E = clone(z); eId = z._id; eWersja = z.wersja || 0; }
+  if (eId !== z._id || !eDirty) { E = clone(z); eBaza = clone(z); eId = z._id; eWersja = z.wersja || 0; }
   dodWiersze = 0;
   const proj = L.projektDlaZapytania(P, z.nazwa);
   M().innerHTML = `
@@ -350,11 +351,15 @@ export async function zapiszArkusz() {
   przytnij();
   const dane = { nazwa: E.nazwa, kod: E.kod ?? "", kodM: E.kodM, dataZap: E.dataZap, zamowienia: E.zamowienia || {}, naglowki: E.naglowki || {}, wiersze: E.wiersze, numer: E.numer ?? null, rok: E.rok ?? null, kolejnosc: E.kolejnosc ?? 0 };
   eDirty = false; status("zapisywanie…");
-  eZapis = zapiszDok(C.z, eId, dane, { typ: "zapytanie", etykieta: E.nazwa, diffFn: diffZap, wersja: eWersja })
+  eZapis = zapiszDok(C.z, eId, dane, { typ: "zapytanie", etykieta: E.nazwa, diffFn: diffZap, wersja: eWersja, baza: eBaza })
     .then(r => {
-      if (r.conflict) { eDirty = true; konflikt(r.conflict); return; }
+      if (r.conflict) { eDirty = true; konflikt(r.conflict, r.konflikty); return; }
       if (r.gone) { toast("To zapytanie zostało usunięte"); return go("zapytania"); }
-      eWersja = r.wersja || eWersja; status(); if (dane.kod) dopiszProjekt(dane.kod);
+      eWersja = r.wersja || eWersja;
+      if (r.dane) eBaza = clone({ ...eBaza, ...r.dane, wersja: eWersja });
+      if (r.scalono) { Object.assign(E, clone(r.dane)); rysujArkusz(); toast(`Połączono z równoległymi zmianami: ${r.scalono}`); }
+      if (r.offline) { status("zapisano w urządzeniu – wyśle się po powrocie sieci"); toast("Zapisano bez internetu – wyśle się samo po powrocie sieci"); } else status();
+      if (dane.kod) dopiszProjekt(dane.kod);
     }).catch(x => { eDirty = true; failed(x); status("błąd zapisu"); }).finally(() => { eZapis = null; if (eDirty && !document.querySelector(".konflikt")) zmiana(); });
   return eZapis;
 }
@@ -364,11 +369,13 @@ export async function zapiszTeraz() {
   if (eDirty) await zapiszArkusz();
   if (eZapis) await eZapis;
 }
-export async function konflikt(cur) {
-  const r = await okno(`<h3 class="konflikt">Ktoś zmienił to zapytanie w międzyczasie</h3><p>${esc(cur.zmienilNazwa || "")} · ${fDT(cur.zmieniono)}</p><p>Możesz wczytać jego wersję (Twoje ostatnie zmiany przepadną) albo zapisać swoją wersję na wierzch.</p>`,
+// ścieżka z łączenia (np. wiersze.3.c.2) → adres komórki jak w Excelu (C5)
+const adresKonfliktu = s => { const p = String(s).split("."); if (p[0] === "wiersze" && p.length === 1) return "wiersze dodane/usunięte"; if (p[0] === "wiersze") { const r = +p[1] + 2; return p[2] === "c" && p[3] != null ? kolLit(+p[3]) + r : p[2] === "a" ? "A" + r : `wiersz ${r}`; } if (p[0] === "naglowki" && p[1] != null) return kolLit(+p[1]) + "1"; if (p[0] === "zamowienia") return "zamówienie"; return p[0]; };
+export async function konflikt(cur, konflikty) {
+  const r = await okno(`<h3 class="konflikt">Ktoś zmienił to zapytanie w międzyczasie</h3><p>${esc(cur.zmienilNazwa || "")} · ${fDT(cur.zmieniono)}</p>${(konflikty || []).length ? `<p>Oboje zmieniliście: <b>${esc([...new Set(konflikty.map(adresKonfliktu))].slice(0, 12).join(", "))}</b>. Pozostałe zmiany łączą się same.</p>` : ""}<p>Możesz wczytać jego wersję (Twoje ostatnie zmiany przepadną) albo zapisać swoją wersję na wierzch.</p>`,
     [{ v: "wczytaj", t: "Wczytaj jego wersję" }, { v: "nadpisz", t: "Zapisz moją wersję", cls: "danger" }]);
   if (r.v === "nadpisz") { eWersja = cur.wersja; eDirty = true; zapiszArkusz(); }
-  else { const z = zapById(eId); E = clone(z); eWersja = z.wersja || 0; eDirty = false; rysujArkusz(); }
+  else { const z = zapById(eId); E = clone(z); eBaza = clone(z); eWersja = z.wersja || 0; eDirty = false; rysujArkusz(); }
 }
 // zdarzenia arkusza
 document.addEventListener("focusin", e => {

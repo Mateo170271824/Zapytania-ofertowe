@@ -751,3 +751,27 @@ export function policzFormule(f) {
   if (!/^[0-9.+\-*/()]+$/.test(s)) return null;
   try { const v = Function(`"use strict";return (${s});`)(); return typeof v === "number" && isFinite(v) ? v : null; } catch { return null; }
 }
+
+/* ============================================================ łączenie zmian (trzy wersje)
+   baza = stan przy wczytaniu, ich = aktualny w bazie, moje = mój stan. Rekurencyjnie po kluczach obiektów
+   i pozycjach list o tej samej długości (komórki arkusza). Jeśli zmieniła tylko jedna strona – bierzemy jej wersję;
+   obie tak samo – bez konfliktu; obie różnie – konflikt (ścieżka). Listy o różnej długości (dodane/usunięte wiersze)
+   po obu stronach = konflikt całej listy. */
+const rowne = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+const obiekt = x => x && typeof x === "object" && !Array.isArray(x);
+export function scal3(baza, ich, moje, sciezka = [], konflikty = []) {
+  if (rowne(ich, baza)) return { wynik: moje, konflikty };
+  if (rowne(moje, baza) || rowne(moje, ich)) return { wynik: ich, konflikty };
+  if (obiekt(ich) && obiekt(moje)) {
+    const b = obiekt(baza) ? baza : {}, w = {};
+    for (const k of new Set([...Object.keys(ich), ...Object.keys(moje), ...Object.keys(b)])) {
+      const r = scal3(b[k], ich[k], moje[k], [...sciezka, k], konflikty).wynik;
+      if (r !== undefined) w[k] = r;
+    }
+    return { wynik: w, konflikty };
+  }
+  if (Array.isArray(ich) && Array.isArray(moje) && Array.isArray(baza) && ich.length === moje.length && moje.length === baza.length)
+    return { wynik: ich.map((x, i) => scal3(baza[i], x, moje[i], [...sciezka, i], konflikty).wynik), konflikty };
+  konflikty.push(sciezka.join("."));
+  return { wynik: moje, konflikty };
+}
